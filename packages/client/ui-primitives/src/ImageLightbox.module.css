@@ -24,6 +24,7 @@
   background: var(--dsw-specific-input-major);
   border: 0;
   box-shadow: var(--dsw-elevation-prominent);
+  cursor: zoom-out;
 }
 
 .close {
