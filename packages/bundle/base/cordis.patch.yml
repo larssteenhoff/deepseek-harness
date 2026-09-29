@@ -204,7 +204,7 @@
     - id: session-telemetry-otel
       name: '@deepseek-ai/dsh-session-telemetry-otel'
       config:
-        mode: !!js process.env.DSH_TELEMETRY_MODE || 'FEEDBACK_ONLY'
+        mode: !!js process.env.DSH_TELEMETRY_MODE || 'DISABLED'
         shutdownTimeoutMillis: 3000
         maxRequestBytes: 4000000
         exporter:

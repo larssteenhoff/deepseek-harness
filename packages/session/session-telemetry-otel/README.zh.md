@@ -11,7 +11,7 @@ kind: "package-reference"
 
 适配器注入 `otel`；[共享 OTel 插件](../../telemetry/otel/README.zh.md) 创建其独立 Session 日志通道。授权、脱敏、身份、scope 版本、配置和关闭期限仍由本包负责。
 
-`dsh-session-telemetry-otel` 仅在新的显式反馈后通过 OTel JS SDK 导出会话记录，适用于所有用户和提供方，包括 `deepseek-official`。`FEEDBACK_ONLY` 释放截至该反馈的权威日志前缀，包含上下文；后续记录等待下一次显式反馈。`DISABLED` 不构造传输。定时批处理可完成已授权的上传，无需另一次用户交互或模型调用。部署方负责脱敏规则。
+`dsh-session-telemetry-otel` 默认关闭。显式设置为 `FEEDBACK_ONLY` 后，才会在新的显式反馈后通过 OTel JS SDK 导出会话记录，适用于所有用户和提供方，包括 `deepseek-official`。`FEEDBACK_ONLY` 释放截至该反馈的权威日志前缀，包含上下文；后续记录等待下一次显式反馈。`DISABLED` 不构造传输。定时批处理可完成已授权的上传，无需另一次用户交互或模型调用。部署方负责脱敏规则。
 
 ## 目录
 
@@ -33,8 +33,8 @@ kind: "package-reference"
 
 | `mode` | 行为 |
 |---|---|
-| `FEEDBACK_ONLY` | 默认值。文本反馈、评分创建或修改、备注修改和撤回释放尚未交接的前缀，截止该权威反馈事件；后续记录等待 |
-| `DISABLED` | 不构造协调器、提供方、处理器或导出器；没有遥测记录离开进程。活跃会话反馈在本地告警；冷会话修改保持静默 |
+| `FEEDBACK_ONLY` | 选择启用。文本反馈、评分创建或修改、备注修改和撤回释放尚未交接的前缀，截止该权威反馈事件；后续记录等待 |
+| `DISABLED` | 默认值。不构造协调器、提供方、处理器或导出器；没有遥测记录离开进程。活跃会话反馈在本地告警；冷会话修改保持静默 |
 
 程序化 TypeScript 配置使用导出的 `SessionTelemetryMode` 枚举；原始字符串字面量不可赋值。`FULL` 会被拒绝，不是别名。[`sharing` 属性](../session-telemetry/README.zh.md#the-sharing-disclosure)报告 `feedback-only` 或 `disabled`，不代表投递回执。`/feedback` 确认文本只确认记录。
 
@@ -46,7 +46,7 @@ kind: "package-reference"
 - id: sessionTelemetry-otel
   name: '@deepseek-ai/dsh-session-telemetry-otel'
   config:
-    mode: FEEDBACK_ONLY       # optional; defaults to FEEDBACK_ONLY
+    mode: FEEDBACK_ONLY       # explicit opt-in; defaults to DISABLED
     shutdownTimeoutMillis: 3000 # optional; defaults to 3000
     exporter:                # explicit SDK transport settings
       url: https://collector.example.com/v1/logs
@@ -57,7 +57,7 @@ kind: "package-reference"
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
-| `mode` | `FEEDBACK_ONLY` | 共享策略：`FEEDBACK_ONLY` 或 `DISABLED` |
+| `mode` | `DISABLED` | 共享策略：`FEEDBACK_ONLY` 或 `DISABLED` |
 | `exporter.url` | 上传模式必填 | 完整 OTLP 日志端点；必须能解析为 `http(s)` |
 | `exporter`, `processor` | — | SDK 传输及字节/条数聚合；不继承环境中的头部和 TLS 身份。agent 工厂负责返回实例的设置，包括 keepAlive |
 | `shutdownTimeoutMillis` | `3,000` | 所有排队 HTTP 请求的外层期限；到期后停止剩余排队发送 |

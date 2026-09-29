@@ -45,7 +45,7 @@ it.skipIf(webSnapshotMode() === 'record')('persists the upload switch and omits 
     await expect.poll(() => toggle.getAttribute('aria-checked')).toBe(String(enabled))
     await expect.poll(async () => {
       const patches = yaml.load(await readFile(join(scaffold.harnessHome, 'profiles/scaffold/cordis.patch.yml'), 'utf8')) as { id: string; config?: { enabled?: boolean } }[]
-      return patches.find(patch => patch.id === 'session-log-deepseek')?.config?.enabled ?? true
+      return patches.find(patch => patch.id === 'session-log-deepseek')?.config?.enabled ?? false
     }).toBe(enabled)
     await page.keyboard.press('Escape')
   }

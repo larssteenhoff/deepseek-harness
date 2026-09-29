@@ -49,7 +49,7 @@ export interface Config {
 
 /** Validated Session-log request contribution configuration. */
 export const Config = z.object({
-  enabled: z.boolean().default(true).volatile(),
+  enabled: z.boolean().default(false).volatile(),
   maxBytes: z.number().step(1).min(1).default(8 * 1024 * 1024),
 })
 

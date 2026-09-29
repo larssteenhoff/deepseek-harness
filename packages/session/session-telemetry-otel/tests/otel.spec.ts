@@ -441,21 +441,22 @@ describe('OpenTelemetrySessionBackend wire', () => {
 
     defaultCtx.plugin(OTel)
     await defaultCtx.plugin(SessionStore)
-    const defaulted = await defaultCtx.plugin(OpenTelemetrySessionBackend, { exporter: { url } })
-    expect(defaultCtx.sessionTelemetry.sharing).toBe('feedback-only')
+    const defaulted = await defaultCtx.plugin(OpenTelemetrySessionBackend)
+    expect(defaultCtx.sessionTelemetry.sharing).toBe('disabled')
     await defaulted.dispose()
 
     // No record was emitted by any mode, so nothing reached the collector.
     expect(captures).toEqual([])
   })
 
-  it('defaults direct construction to feedback-only delivery', async () => {
+  it('supports direct opt-in construction for feedback-only delivery', async () => {
     const { url, captures } = await mockCollector()
     const ctx = new Context()
     ctx.plugin(OTel)
     try {
       await ctx.plugin(SessionStore)
       new OpenTelemetrySessionBackend(ctx, {
+        mode: SessionTelemetryMode.FEEDBACK_ONLY,
         exporter: { url },
         processor: { scheduledDelayMillis: 1 },
       })
@@ -731,12 +732,11 @@ describe('OpenTelemetrySessionBackend config fails loud', () => {
     expectTypeOf<SessionTelemetryMode.FEEDBACK_ONLY>().toExtend<SessionTelemetryMode>()
     expect(Object.values(SessionTelemetryMode)).toEqual(['FEEDBACK_ONLY', 'DISABLED'])
     expect(() => Config({ mode: 'FULL' } as unknown as Config)).toThrow()
-    expect(DEFAULT_TELEMETRY_MODE).toBe(SessionTelemetryMode.FEEDBACK_ONLY)
+    expect(DEFAULT_TELEMETRY_MODE).toBe(SessionTelemetryMode.DISABLED)
     expect(Config({}).mode).toBe(DEFAULT_TELEMETRY_MODE)
   })
 
   it.each([
-    [{}, /exporter\.url is required/],
     [{ mode: SessionTelemetryMode.FEEDBACK_ONLY }, /exporter\.url is required/],
     [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: '' } }, /exporter\.url is required/],
     [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'not a url' } }, /not a valid URL/],

@@ -107,7 +107,7 @@ Files 模式通过 `maxRequestFilesBytes` 与 `maxImagesPerRequest` 限制保留
 
 ### 提供方专用请求字段
 
-存在 `ctx.deepseekLlmApiExtensions` 时，适配器会在 `fetch` 前根据确切序列化基础请求准备已注册顶层字段。准备或字段冲突在 HTTP 前失败；2xx 响应后，适配器会在消费 SSE（Server-Sent Events）前接受每项已捕获贡献。传输与非 2xx 失败不会接受它们。基础请求连同扩展字段无法序列化时，适配器只发送基础请求并跳过接受，让贡献方在之后的请求中重发自身状态，同时记录一条列出被省略字段的告警。随产品交付的组合用它提供默认启用的增量 `dsh_session_log` 字段和默认启用的活跃 `dsh_plugin_packages` 清单；两者都留在模型输入之外。
+存在 `ctx.deepseekLlmApiExtensions` 时，适配器会在 `fetch` 前根据确切序列化基础请求准备已注册顶层字段。准备或字段冲突在 HTTP 前失败；2xx 响应后，适配器会在消费 SSE（Server-Sent Events）前接受每项已捕获贡献。传输与非 2xx 失败不会接受它们。基础请求连同扩展字段无法序列化时，适配器只发送基础请求并跳过接受，让贡献方在之后的请求中重发自身状态，同时记录一条列出被省略字段的告警。随产品交付的组合用它提供默认关闭的增量 `dsh_session_log` 字段和默认启用的活跃 `dsh_plugin_packages` 清单；两者都留在模型输入之外。
 
 ### 失败与恢复
 
@@ -155,7 +155,7 @@ Files 模式通过 `maxRequestFilesBytes` 与 `maxImagesPerRequest` 限制保留
 - [LLM 流式子系统](../../../docs/subsystems/llm-streaming.zh.md)——`StreamChunk` 协议与适配器约定。
 - [llm-retry](../llm-retry/README.zh.md)——应用本适配器 `retryPolicy` 的重试执行器。
 - [DeepSeek 请求扩展](../deepseek-llm-api-extensions/README.zh.md)——提供方专用顶层字段的生命周期与接受语义。
-- [会话日志上传](../../session/session-log-deepseek/README.zh.md)——默认启用的增量 `dsh_session_log` 贡献。
+- [会话日志上传](../../session/session-log-deepseek/README.zh.md)——默认关闭的增量 `dsh_session_log` 贡献。
 - [插件包清单](../plugin-package-inventory-deepseek/README.zh.md)——默认启用的 `dsh_plugin_packages` 贡献。
 - [孪生 LLM 适配器](../../../.agents/notes/implemented/architecture/2026-06-13-twin-llm-adapters.zh.md)——为什么 DeepSeek 交付两个结构不同的适配器。
 - [强制应用归因标头](../../../.agents/notes/implemented/architecture/2026-06-21-mandatory-app-attribution-headers.zh.md)——每个提供方请求携带的身份。

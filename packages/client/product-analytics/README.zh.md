@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-桌面端默认通过现有 OTel 产品导出器上报指定交互，不提供用户操作入口。普通 Web 客户端不会提交这些事件，缺失的登录身份字段会省略。
+桌面端产品埋点默认关闭。部署方可通过配置显式启用指定交互的上报；普通 Web 客户端不会提交这些事件，缺失的登录身份字段会省略。
 
 ## 目录
 
@@ -21,7 +21,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-桌面端同时装配 Analytics 与必需的 Telemetry 导出器。`product-analytics` settings 命名空间持有动态 `enabled` 字段，默认 `true`，通过现有 Cordis Config / settings 机制配置，暂不提供用户操作入口。普通 Web 不装配这两个服务。关闭后不读取埋点身份、不接收新事件；导出器仍保持挂载，已入队事件可以继续导出。会话反馈遥测采用独立策略。
+桌面端同时装配 Analytics 与必需的 Telemetry 导出器，动态 `enabled` 字段默认 `false`。部署方必须通过 Cordis Config / settings 显式设置 `enabled: true` 才能启用；暂不提供用户操作入口。普通 Web 不装配这两个服务。关闭后不读取埋点身份、不接收新事件；导出器仍保持挂载，已入队事件可以继续导出。会话反馈遥测采用独立策略。
 
 渲染端和 Electron 通过现有认证流订阅 Host 策略变化及重连后的值；Electron 在原生启动上报前还会读取初始策略。欢迎窗口通过 IPC 获取当前策略。Host 在接收事件及读取身份后都检查当前 volatile 配置。`DSH_PRODUCT_ANALYTICS_OTLP_URL` 可覆盖导出目的地，用于隔离的接收端。[导出器](../../host/product-telemetry-otel/README.zh.md)负责批量发送、重试和退出时的交付。
 

@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Desktop reports selected interactions through the existing OTel product exporter by default, without a user-facing control. Ordinary Web clients never submit these events, and missing login identity is omitted.
+Desktop product analytics is disabled by default. Deployments can explicitly enable selected interaction reports through configuration; ordinary Web clients never submit these events, and missing login identity is omitted.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ Desktop reports selected interactions through the existing OTel product exporter
 <a id="use-this-package"></a>
 ## Use this package
 
-Desktop mounts Analytics and its required Telemetry exporter. The `product-analytics` settings namespace owns the live `enabled` field, which defaults to `true`; configure it through the existing Cordis Config / settings mechanism. There is no user-facing control. Ordinary Web mounts neither service. Disabled collection reads no analytics identity and accepts no new events; the exporter remains mounted and may finish exporting records already queued. Session-feedback telemetry has its own policy.
+Desktop mounts Analytics and its required Telemetry exporter with the live `enabled` field defaulting to `false`. A deployment must explicitly set `enabled: true` through Cordis Config / settings to opt in; there is no user-facing control. Ordinary Web mounts neither service. Disabled collection reads no analytics identity and accepts no new events; the exporter remains mounted and may finish exporting records already queued. Session-feedback telemetry has its own policy.
 
 The renderer and Electron subscribe to the Host policy through the existing authenticated stream, including reconnection. Electron also reads the initial policy before native launch reporting. Welcome obtains the current policy over IPC. The Host checks its current volatile configuration again at event intake and after identity lookup. `DSH_PRODUCT_ANALYTICS_OTLP_URL` overrides the export destination for isolated collectors. The [exporter](../../host/product-telemetry-otel/README.md) owns batching, retry, and shutdown delivery.
 

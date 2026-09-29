@@ -58,7 +58,7 @@
       name: '@deepseek-ai/dsh-client-product-analytics'
       disabled: !!js "ctx.get('profileContext')?.name !== 'desktop'"
       config:
-        enabled: true
+        enabled: false
         appVersion: !!js process.env.DSH_CLIENT_VERSION
 
     # Host-owned opt-in sampled when a new Web session receives its preset

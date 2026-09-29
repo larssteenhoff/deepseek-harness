@@ -2734,7 +2734,7 @@ export interface Config {
  * and shutdown deadline at plugin load; `DISABLED` reads neither.
  */
 export interface Config {
-  /** Defaults to `FEEDBACK_ONLY`: capture session history only when feedback is explicitly submitted. */
+  /** Defaults to `DISABLED`; set `FEEDBACK_ONLY` to export a prefix after explicit feedback. */
   mode?: SessionTelemetryMode
   /**
    * Explicit SDK HTTP transport settings, including optional routing headers.
