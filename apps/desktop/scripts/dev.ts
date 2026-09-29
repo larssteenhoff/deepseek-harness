@@ -71,7 +71,7 @@ async function launchElectron(): Promise<void> {
     DSH_HOME: home,
     DSH_DESKTOP_PRIMARY_RUNTIME_DIR: primaryRuntimeDir,
     DSH_DESKTOP_HOST_INSPECT_PORT: String(hostPort),
-    DSH_DESKTOP_OPEN_DEVTOOLS: process.env.DSH_DESKTOP_OPEN_DEVTOOLS ?? '1',
+    DSH_DESKTOP_OPEN_DEVTOOLS: process.env.DSH_DESKTOP_OPEN_DEVTOOLS ?? '0',
     ELECTRON_ENABLE_LOGGING: process.env.ELECTRON_ENABLE_LOGGING ?? '1',
   }
   console.log(`desktop development: DSH_HOME=${home}`)
