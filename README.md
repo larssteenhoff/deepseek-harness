@@ -14,6 +14,10 @@ DeepSeek Harness is in _developer preview_ and iterating rapidly. **THERE WILL B
 
 Review the [safety notice](SAFETY.md) before running the project.
 
+## Screenshot
+
+<p align="center"><img src="docs/user/guide/harness-image-generation.png" alt="DeepSeek Harness displaying a generated mushroom forest image and its resolution" width="100%"></p>
+
 ## Run
 
 ### Run from `npm`
