@@ -89,7 +89,7 @@
   width: 800px;
   height: min(800px, calc(100vh - 2 * max(24px, var(--dsh-frame-overlay-top, 24px))));
   max-width: calc(100vw - 48px);
-  border-radius: var(--dsw-radius-panel);
+  border-radius: calc(var(--dsw-radius-panel) * 0.5);
   overflow: hidden;
   background: var(--dsw-alias-bg-layer-2);
   box-shadow: var(--dsw-elevation-prominent);

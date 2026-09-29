@@ -1,4 +1,4 @@
-/* Session-header agent-preset label: static chrome, never a control. */
+/* Session-header preset label and blank-session selector. */
 
 .label {
   display: inline-flex;
@@ -17,9 +17,59 @@
   text-overflow: ellipsis;
 }
 
+button.label {
+  width: max-content;
+  appearance: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.label:hover:not(:disabled),
+button.label[aria-expanded='true'] {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+button.label:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .icon {
   flex: none;
   opacity: 0.7;
+}
+
+.chevron {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  color: var(--dsw-alias-label-caption);
+}
+
+.menuAnchor {
+  min-width: 0;
+  max-width: 180px;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 280px;
+}
+
+.itemName {
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.itemDesc {
+  color: var(--dsw-alias-label-caption);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: normal;
 }
 
 /* First sacrifice when the title row (the enclosing inline-size container)

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 /**
  * The two conversation-adjacent surfaces: the new-session chip naming the
- * next session's preset, and the session header's read-only label. The split
- * is the host's rule — a session's history is produced under its preset's
- * tools, so the choice is only ever offered before one starts.
+ * next session's preset, and the session header's picker/label. The host
+ * permits a choice while a session is blank; after its first prompt, its tool
+ * composition is fixed.
  */
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -81,15 +81,19 @@ function renderLabel(
     ...ROSTER_READY, options: SEAT_READY.options, ...roster,
   })
   const sessions = createSnapshotStore({ byId: summary === undefined ? {} : { s1: summary } })
+  const seat = createSnapshotStore<AgentPresetSeatState>(SEAT_READY)
   const load = vi.fn(() => Promise.resolve())
+  const select = vi.fn(() => Promise.resolve(undefined))
   const view = render(<AgentPresetLabel {...({
     load,
+    select,
     sessionId: 's1',
     useSessions: bindSnapshotSelector(sessions),
     useAgentPresets: bindSnapshotSelector(store),
+    useAgentPresetSeat: bindSnapshotSelector(seat),
     t: (key: keyof typeof en) => en[key],
   } as unknown as AgentPresetLabelProps)} />)
-  return { load, view }
+  return { load, select, view }
 }
 
 describe('the new-session chip', () => {
@@ -327,7 +331,7 @@ describe('the chip introduce cue', () => {
 })
 
 describe('the session-header label', () => {
-  it('names the preset the session runs, and never offers a switch', async () => {
+  it('names the preset a started session runs without offering an unsupported switch', async () => {
     const { load } = renderLabel({
       blank: false,
       projectionValues: { agentPreset: 'standard' },
@@ -339,10 +343,18 @@ describe('the session-header label', () => {
     expect(screen.getByTitle(en.presetStandardDescription).textContent).toBe(en.presetStandardName)
   })
 
+  it('offers a dropdown while the session is still blank and applies the selected preset', async () => {
+    const { select } = renderLabel({ blank: true, projectionValues: { agentPreset: 'standard' } })
+    await waitFor(() => { expect(screen.getByRole('button').textContent).toContain(en.presetStandardName) })
+    fireEvent.click(screen.getByRole('button'))
+    fireEvent.click(screen.getByText('mine'))
+    expect(select).toHaveBeenCalledWith('mine')
+  })
+
   it('falls back to the id, and to the generic hint, when metadata is absent', () => {
     renderLabel({ blank: true, projectionValues: { agentPreset: 'mine' } })
 
-    expect(screen.getByTitle(en.headerHint).textContent).toBe('mine')
+    expect(screen.getByTitle(en.seatHint).textContent).toContain('mine')
   })
 
   it('shows the id until the roster resolves it', () => {

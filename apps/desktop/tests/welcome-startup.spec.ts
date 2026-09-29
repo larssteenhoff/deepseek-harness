@@ -167,7 +167,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-it.each([false, true])('starts welcome onboarding without carrying update focus into login or skip (Windows update=%s)', async (updated) => {
+it.each([false, true])('opens the workspace on startup without welcome onboarding (Windows update=%s)', async (updated) => {
   vi.resetModules()
   vi.clearAllMocks()
   state.preference = 'zh'
@@ -187,9 +187,7 @@ it.each([false, true])('starts welcome onboarding without carrying update focus 
   vi.stubEnv('DSH_DESKTOP_MANDATORY_UPDATE_CONFIG', undefined)
   vi.stubEnv('DSH_DESKTOP_UPDATE_JOURNAL_DIR', undefined)
   const reading = Promise.withResolvers<undefined>()
-  const loading = Promise.withResolvers<undefined>()
   state.beforeRead.mockReturnValueOnce(reading.promise)
-  state.beforeWelcome.mockReturnValueOnce(loading.promise)
   const activate = () => {
     state.appListeners.get('second-instance')!()
     state.appListeners.get('open-url')!({ preventDefault: vi.fn() }, 'dsh://open')
@@ -200,20 +198,22 @@ it.each([false, true])('starts welcome onboarding without carrying update focus 
     activate()
     expect(state.showWorkspace).not.toHaveBeenCalled()
     reading.resolve(undefined)
-    await vi.waitFor(() => { expect(state.beforeWelcome).toHaveBeenCalledOnce() })
+    await vi.waitFor(() => { expect(state.showWorkspace).toHaveBeenCalledOnce() })
     activate()
-    expect(state.showWorkspace).not.toHaveBeenCalled()
+    expect(state.showWorkspace).toHaveBeenCalledTimes(3)
   } finally {
     reading.resolve(undefined)
-    loading.resolve(undefined)
   }
+  expect(state.beforeWelcome).not.toHaveBeenCalled()
+  // Expired account sessions may still open the sign-in flow explicitly.
+  state.expiryListener!()
   await vi.waitFor(() => { expect(state.operations).toBeDefined() })
   expect(state.startHost).toHaveBeenCalledOnce()
   expect(state.loadWorkspace).toHaveBeenCalledExactlyOnceWith('dsh-app://app/')
-  expect(state.showWorkspace).not.toHaveBeenCalled()
+  expect(state.showWorkspace).toHaveBeenCalledTimes(3)
   state.loadWorkspace.mockClear()
   expect(state.welcomeLocale).toMatchObject({ id: 'zh-CN' })
-  expect(await state.operations!.takeNotice()).toBeUndefined()
+  expect(await state.operations!.takeNotice()).toBe('session-expired')
   expect(state.dialogLocale!().id).toBe('zh-CN')
   const attemptId = 'login' as NonNullable<AccountView['attempt']>['id']
   const account: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '' },
@@ -231,16 +231,14 @@ it.each([false, true])('starts welcome onboarding without carrying update focus 
   expect(state.copy).toHaveBeenCalledTimes(2)
   await state.operations!.skip()
   expect(state.loadWorkspace).not.toHaveBeenCalled()
-  expect(state.showWorkspace).toHaveBeenCalledOnce()
-  expect(state.moveTopWorkspace).not.toHaveBeenCalled()
-  expect(state.focusWorkspace).not.toHaveBeenCalled()
+  expect(state.showWorkspace).toHaveBeenCalledTimes(4)
   expect(state.windowOptions).toMatchObject({
     ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 18 }, vibrancy: 'sidebar' } : {}),
     webPreferences: { contextIsolation: true, sandbox: true },
   })
   expect(state.closeWelcome).toHaveBeenCalledOnce()
   activate()
-  expect(state.showWorkspace).toHaveBeenCalledTimes(3)
+  expect(state.showWorkspace).toHaveBeenCalledTimes(6)
   expect(state.quit).not.toHaveBeenCalled()
   expect(state.stopHost).not.toHaveBeenCalled()
   const contents = state.contents as { mainFrame: { url: string }; send: ReturnType<typeof vi.fn> }
@@ -283,6 +281,7 @@ it.each([false, true])('starts welcome onboarding without carrying update focus 
   expect(await state.operations!.takeNotice()).toBeUndefined()
   state.showWorkspace.mockClear()
   state.focusWorkspace.mockClear()
+  state.moveTopWorkspace.mockClear()
   vi.stubEnv('DSH_DESKTOP_OPEN_DEVTOOLS', '1')
   state.accountListener!({ ...account, status: 'credential-stored', attempt: { id: attemptId, phase: 'succeeded' } })
   await vi.waitFor(() => { expect(state.showInactiveWorkspace).toHaveBeenCalledOnce() })

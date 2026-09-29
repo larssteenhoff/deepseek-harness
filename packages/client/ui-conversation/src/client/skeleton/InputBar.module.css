@@ -49,18 +49,18 @@
   flex-direction: column;
   /* figma Input 75:8208: 12px between the text area and the button row; the
      card's top pad before .InputText tightened from the drawn 10 to 8. */
-  gap: 12px;
+  gap: 6px;
   width: 100%;
   max-width: var(--dsh-composer-card-max-width);
-  padding-top: 8px;
+  padding-top: 0;
   /* Input stroke: the light neutral (l2, one step above the menus' l1),
      drawn as the elevation hairline so it costs no layout; the shadow is the
      soft elevation tier. Fill: the input surface token (elevated in dark). */
   border: 0;
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-panel);
-  background: var(--dsw-specific-input-major);
-  box-shadow: var(--dsw-elevation-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   /* The draft text follows the Settings font-size preference (the textarea,
      mirror, and backdrop all inherit from here, so the three layers stay in
      step); the line height keeps the default 10px leading via the shared px
@@ -74,6 +74,51 @@
      (see ui-theme styles/scrollbar.css for the rebinding contract). */
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+}
+
+.inputPill,
+.row {
+  border-radius: calc(var(--dsw-radius-panel) * 0.5);
+  background: var(--dsw-specific-input-major);
+  box-shadow: var(--dsw-elevation-soft);
+}
+
+.row {
+  background: transparent;
+  box-shadow: none;
+}
+
+.inputPill {
+  position: relative;
+  /* Keep the editor centered in the full pill: equal vertical insets leave
+     its text and the absolutely positioned action on the same midline. */
+  padding: 4px 44px 4px 0;
+}
+
+.inputLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.inputTools {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+
+.inputTools[hidden] {
+  display: none;
+}
+
+.inputLine > .inputPill {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.inputPillWithStop {
+  padding-right: 80px;
 }
 
 /* No-workspace trigger state: an inset 1px dashed outline marks the card as a
@@ -90,7 +135,7 @@
   inset: 0;
   box-sizing: border-box;
   border: 1px dashed currentColor;
-  border-radius: var(--dsw-radius-panel);
+  border-radius: calc(var(--dsw-radius-panel) * 0.5);
   color: var(--dsw-alias-border-l4);
   transition: color 100ms ease;
   pointer-events: none;
@@ -133,10 +178,9 @@
   margin-right: 4px;
 }
 
-/* The card's corner arc still overlaps the scrollport's top (8px top
-   pad reaches only y=8): start the thumb's travel below the arc so it never
-   pokes outside the capsule. WebKit-path only; Firefox's thin bar has no
-   track margin, an accepted remainder. */
+/* Start the thumb's travel below the card's rounded top arc so it never pokes
+   outside the capsule. WebKit-path only; Firefox's thin bar has no track
+   margin, an accepted remainder. */
 .scroll::-webkit-scrollbar-track {
   margin-top: 8px;
 }
@@ -168,10 +212,13 @@
    bar inset. */
 .input {
   box-sizing: border-box;
-  /* Docked floor: one 24px line + 4px top pad = 28 content height; 36 leaves
-     an 8px breath below the line (the hero keeps its own 52px floor below). */
-  min-height: 36px;
-  padding: 4px 8px 0 14px;
+  --dsh-composer-input-min-height: 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  /* Center the text within the pill; the hero keeps its own 52px floor below. */
+  min-height: var(--dsh-composer-input-min-height);
+  padding: 0 8px 0 14px;
   font-family: var(--dsw-font-family);
   font-size: inherit;
   line-height: inherit;
@@ -182,6 +229,12 @@
   color: var(--dsw-alias-label-primary);
   /* Business blue, not brand-primary: that token resolves to ink in this sheet. */
   caret-color: var(--dsw-alias-state-business-primary);
+}
+
+/* An empty contenteditable has no paragraph for flex centering to move; inset
+   its first caret line by half the extra room, using its live line height. */
+.input:empty {
+  padding-top: max(0px, calc((var(--dsh-composer-input-min-height) - 1lh) / 2));
 }
 
 /* Lexical paragraphs are <p> blocks: strip the UA margins so the surface
@@ -212,7 +265,8 @@
    36px floor. */
 .placeholder {
   position: absolute;
-  inset: 4px 8px auto 14px;
+  inset: 50% 8px auto 14px;
+  transform: translateY(-50%);
   color: var(--dsw-alias-label-caption);
   white-space: nowrap;
   overflow: hidden;
@@ -233,7 +287,7 @@
 /* Hero (centered empty-state) keeps the 2-line floor (figma min-h 52 = ~2 × 24
    line + 4pt); the docked composer collapses to the content height. */
 .hero .input {
-  min-height: 52px;
+  --dsh-composer-input-min-height: 52px;
 }
 
 /* The hero's 52px floor fits two lines, so its placeholder clamps at two
@@ -254,10 +308,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  /* 2px moved from the bottom pad to the top: the whole control row sits 2px
-     lower in the card (it read too high against the textarea) while the
-     controls' own centering stays untouched. */
-  padding: 2px 8px 6px;
+  padding: 4px 8px;
   min-width: 0;
   /* Size container so the chips inside can collapse to icon-only when the
      card runs out of row width (PermissionSelect @container rule). Anonymous
@@ -288,6 +339,9 @@
 
 .modes {
   gap: 12px;
+  /* Preserve the controls' former horizontal start after the plus moved up
+     beside the text pill (28px control + the old 12px toolbar gap). */
+  margin-left: 40px;
 }
 
 .trailing {
@@ -307,6 +361,10 @@
   .modes,
   .trailing {
     gap: 8px;
+  }
+
+  .modes {
+    margin-left: 36px;
   }
 }
 
@@ -384,11 +442,30 @@
   color: #fff;
   cursor: pointer;
   transition: background-color 100ms ease;
-  /* Opts out of the row's 2px downward shift (.row top pad): the send circle
-     keeps its original seat while the smaller chips sit lower. Transform, not
-     margin, so flex centering math is untouched. */
-  transform: translateY(-2px);
 }
+
+.sendPrimary,
+.stopPrimary {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+}
+
+.sendPrimary {
+  width: 28px;
+  height: 28px;
+}
+
+/* `.primary` sets display:grid, which otherwise overrides the browser's
+   default `[hidden]` rule and leaves the empty-draft arrow visible. */
+.sendPrimary[hidden] {
+  display: none;
+}
+
+.sendPrimary { right: 8px; }
+.stopPrimary { right: 44px; }
 
 .primary:hover:not(:disabled) {
   background: var(--dsw-alias-button-info-hover);

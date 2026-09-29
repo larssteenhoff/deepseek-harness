@@ -1,14 +1,13 @@
 /**
  * Agent-preset surface plugin, browser half — three surfaces over one roster:
- * a chip on the new-session screen for the session about to start, a
- * read-only label in the session header, and a settings section that lists
+ * a chip on the new-session screen, a session-header picker for blank
+ * sessions (read-only after they start), and a settings section that lists
  * the roster (selection, the new-task default, a read-only view of each
  * declared composition, and the way into Creator mode).
  *
- * A running session keeps the composition it began with (the host refuses to
- * adopt an existing session under a different preset). That is what splits
- * the choice from the display: the hero chip is before-the-fact, while the
- * header only reports what a session already runs. The default preset is
+ * A session keeps the composition it began with once its conversation starts;
+ * the header lets a blank session choose and then reports its active preset.
+ * The default preset is
  * edited where the roster is visible — the settings section's "make default"
  * — so General settings carries no duplicate control for the same field.
  *
@@ -162,10 +161,15 @@ export function apply(ctx: ClientContext): void {
       }
     }
 
-    const labelInjected = (): AgentPresetLabelInjected => ({
-      hooks: { agentPresets: controller.store },
-      load: () => controller.load(),
-    })
+    const labelInjected = (sessionId?: SessionId): AgentPresetLabelInjected => {
+      const binding = sessionId === undefined ? undefined : ctx.sessions.binding(sessionId)
+      const seat = binding === undefined ? unboundSeat : seatFor(binding)
+      return {
+        hooks: { agentPresets: controller.store, agentPresetSeat: seat.store },
+        load: () => controller.load(),
+        select: (id: string) => seat.select(id),
+      }
+    }
 
     scope.effect(() => {
       creatorDraft = () => {

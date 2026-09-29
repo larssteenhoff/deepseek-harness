@@ -289,6 +289,16 @@ describe('scrollbar.css geometry variables', () => {
     for (const property of GEOMETRY_VARIABLES) {
       expect(definitions.get(property), property).toMatch(/^\d+(?:\.\d+)?px$/)
     }
+    expect(definitions.get(WIDTH_VARIABLE)).toBe('14px')
+    expect(definitions.get(THUMB_BORDER_VARIABLE)).toBe('2px')
+  })
+
+  it('uses the native non-thin scrollbar on the standard-property path', () => {
+    const width = scrollbarRules
+      .filter(rule => rule.declarations.some(([property]) => property === 'scrollbar-width'))
+      .flatMap(rule => rule.declarations)
+      .find(([property]) => property === 'scrollbar-width')?.[1]
+    expect(width).toBe('auto')
   })
 
   it('routes WebKit scrollbar geometry through those variables', () => {

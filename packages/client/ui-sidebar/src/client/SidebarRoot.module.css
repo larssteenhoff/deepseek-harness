@@ -42,7 +42,7 @@
   padding: 0;
 }
 
-:global([data-windows-titlebar]) .toggle {
+:global([data-windows-titlebar]) .windowToggle .toggle {
   position: fixed;
   top: calc((var(--dsh-windows-titlebar-height) - 28px) / 2);
   left: 12px;
@@ -200,15 +200,16 @@
 }
 
 /* The strip's full 52px foot leaves the wordmark too low; the content column
-   tucks 12px back under it, still clear of the toggle (28px control centered
-   in the strip ends at y 40). */
+   tucks 12px back under it. */
 .topStrip + .logoRow {
   margin-top: -12px;
 }
 
-/* Logo row (figma pad (4,8,4,8)): expanded keeps the panel toggle at the
-   right edge; the rail gives every control the same base left anchor before
-   the shared entry translation is applied. macOS hiddenInset titlebar: the row
+/* Logo row (figma pad (4,8,4,8)): content determines its height, so a brand
+   slot intentionally rendered empty does not leave a full logo-sized gap.
+   Expanded keeps the brand in its drag surface; the rail gives every control
+   the same base left anchor before the shared entry translation is applied.
+   macOS hiddenInset titlebar: the row
    is marked `data-window-drag` in markup (SidebarRoot), so ui-web base.css's
    single darwin rule carries the drag over its own box — below the top strip
    (40–100px: the strip's 52px foot with the row's -12px tuck). The brand rides
@@ -223,17 +224,31 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  height: 60px;
+  height: auto;
+  min-height: 0;
   padding: 8px 0 8px 4px;
   margin-bottom: 4px;
   box-sizing: border-box;
   overflow: hidden;
 }
 
+/* When both brand slots resolve empty (for example, a brand-removal plugin),
+   collapse the now-vacant row along with the brand button so it does not leave
+   a logo-sized blank above New Session. */
+.logoRow:has(.brandMark > [data-slot='sidebar.brand.mark']:empty):has(.brandName > [data-slot='sidebar.brand.name']:empty) {
+  height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.logoRow:has(.brandMark > [data-slot='sidebar.brand.mark']:empty):has(.brandName > [data-slot='sidebar.brand.name']:empty) .brand {
+  display: none;
+}
+
 .collapsed .logoRow {
-  height: 36px;
+  height: 0;
   padding: 0;
-  margin-bottom: 12px;
+  margin-bottom: 0;
   justify-content: flex-start;
   /* The settled rail's 36px toggle is wider than this 35px row; the base row's clip would cut
      the control's right edge, so the rail stops clipping once the slide has settled. */
@@ -433,11 +448,11 @@
 }
 
 :global([data-platform='darwin']) :global([data-ds-dark-theme]) .newSession {
-  background: rgb(255 255 255 / 0.15);
+  background: rgb(255 255 255 / 0.09);
 }
 
 :global([data-platform='darwin']) :global([data-ds-dark-theme]) .newSession:hover {
-  background: rgb(255 255 255 / 0.2);
+  background: rgb(255 255 255 / 0.14);
 }
 
 .collapsed .newSession {
@@ -578,11 +593,22 @@
   flex-direction: column;
 }
 
+.settingsRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .settingsArea,
 .footerActions {
   flex: none;
   min-width: 0;
   width: 100%;
+}
+
+.settingsArea {
+  flex: 1;
 }
 
 .footerActions {
@@ -598,6 +624,19 @@
   display: flex;
   justify-content: center;
   width: auto;
+}
+
+.collapsed .settingsRow {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.windowToggle {
+  position: fixed;
+  inset: 0 auto auto 0;
+  z-index: 30;
+  width: 0;
+  height: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

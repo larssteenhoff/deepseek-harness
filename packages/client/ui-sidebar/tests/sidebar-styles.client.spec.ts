@@ -64,6 +64,13 @@ describe('SidebarRoot.module.css', () => {
     expect(declarations('.collapsed .newSession')?.get('width')).toBe('36px')
   })
 
+  it('uses a darker New Session fill in the macOS dark theme', () => {
+    expect(declarations(":global([data-platform='darwin']) :global([data-ds-dark-theme]) .newSession")?.get('background'))
+      .toBe('rgb(255 255 255 / 0.09)')
+    expect(declarations(":global([data-platform='darwin']) :global([data-ds-dark-theme]) .newSession:hover")?.get('background'))
+      .toBe('rgb(255 255 255 / 0.14)')
+  })
+
   it('keeps the slotted brand row at the full artwork height', () => {
     expect(declarations('.brandIdentity')?.get('height')).toBe('24px')
     expect(declarations('.brandName')?.get('height')).toBe('24px')

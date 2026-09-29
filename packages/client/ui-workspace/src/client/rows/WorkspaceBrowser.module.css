@@ -1,6 +1,6 @@
 .root {
   --dsh-session-list-edge-inset: var(--dsh-sidebar-inline-padding);
-  --dsh-session-list-scrollbar-width: 5px;
+  --dsh-session-list-scrollbar-width: 10px;
   --dsh-session-list-scrollbar-offset: 2px;
   flex: 1;
   min-height: 0;

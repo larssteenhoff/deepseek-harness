@@ -17,7 +17,7 @@ import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   HoverCard, IconArchiveOutlineRegular, IconEditOutlineRegular,
   IconEllipsisOutlineRegular, IconFolderCloseRegular, IconFolderOpenRegular,
-  IconNewChatOutlineRegular, IconPinFillRegular, IconTrashOutlineRegular,
+  IconPlusOutlineMedium, IconPinFillRegular, IconTrashOutlineRegular,
   IconTriangleRightFillRegular, IconUnarchiveOutlineRegular, Menu, relativeTime, StateDot, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
@@ -302,7 +302,7 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
             aria-label={t('actions.newSession.aria', { name: label })}
             onClick={(e) => { e.stopPropagation(); onCreate() }}
           >
-            <IconNewChatOutlineRegular />
+            <IconPlusOutlineMedium />
           </button>
         </Tooltip>
       </span>

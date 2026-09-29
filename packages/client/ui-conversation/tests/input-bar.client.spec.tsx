@@ -1181,10 +1181,18 @@ describe('running and lock semantics', () => {
 
   it('idle primary sends and disables on empty draft', () => {
     const { button, sink } = bench({ draft: 'go' })
+    expect(button.hidden).toBe(false)
     fireEvent.click(button)
     expect(sink).toHaveBeenCalledWith('go', [], 'queue', expect.any(AbortSignal))
     const empty = bench()
     expect(empty.button.disabled).toBe(true)
+    expect(empty.button.hidden).toBe(true)
+  })
+
+  it('keeps Stop visible when the running composer has no draft', () => {
+    const { button } = bench({ running: true })
+    expect(button.getAttribute('aria-label')).toBe('停止生成')
+    expect(button.hidden).toBe(false)
   })
 
   it('unlock refocuses the surface; mousedown on the button keeps focus', () => {
@@ -1692,6 +1700,17 @@ describe('command launcher chrome and control seats', () => {
     expect(toggleCommandMenu).toHaveBeenCalledExactlyOnceWith({ start: 2, end: 7 })
     act(() => { menuLauncher.set('command') })
     expect(launcher.getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('places the command plus to the left of the input pill', () => {
+    const { view } = bench({ toggleCommandMenu: vi.fn() })
+    const launcher = view.getByLabelText('添加文件或调用指令')
+    const line = launcher.closest('[class*="inputLine"]')
+    const pill = view.container.querySelector('[class*="inputPill"]')
+
+    expect(line).not.toBeNull()
+    expect(line?.firstElementChild?.contains(launcher)).toBe(true)
+    expect(line?.lastElementChild).toBe(pill)
   })
 
   it('opening the command menu from the button puts the keyboard in the editor first', () => {

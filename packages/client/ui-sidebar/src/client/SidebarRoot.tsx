@@ -19,7 +19,7 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
-  FishLogo, IconNewChatOutlineMedium, IconNewChatOutlineRegular, IconPanelLeftOutlineRegular, isDarwinDesktop, ShortcutKeys, Tooltip,
+  FishLogo, IconPlusOutlineMedium, IconPanelLeftOutlineRegular, isDarwinDesktop, ShortcutKeys, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
@@ -212,7 +212,8 @@ export function SidebarRoot({
     >
       {/* macOS hiddenInset titlebar: the strip shares the row with the
           traffic lights and keeps the toggle at the sidebar's top-right. */}
-      {darwinDesktop && <div className={css.topStrip} data-window-drag>{toggle}</div>}
+      {darwinDesktop && <div className={css.topStrip} data-window-drag />}
+      {windowsTitlebar && collapsed && <div className={css.windowToggle}>{toggle}</div>}
       <div className={css.logoRow} data-window-drag>
         {/* Expanded, the brand doubles as a New Session shortcut — except on
             macOS, where it stays part of the logo row's window-drag surface
@@ -254,7 +255,6 @@ export function SidebarRoot({
               </Tooltip>
             )
         })()}
-        {!darwinDesktop && toggle}
       </div>
 
       {/* The label fades before the hover/focus shortcut, including on translucent backgrounds. */}
@@ -268,8 +268,8 @@ export function SidebarRoot({
         >
           <span className={css.newSessionLabelMask}><span className={css.newSessionContent}>
             {wide
-              ? <IconNewChatOutlineMedium size={14} />
-              : <IconNewChatOutlineRegular size={windowsTitlebar ? 16 : 18} />}
+              ? <IconPlusOutlineMedium size={14} />
+              : <IconPlusOutlineMedium size={windowsTitlebar ? 16 : 18} />}
             {wide && <span className={clsx(css.newSessionLabel, css.wide)}>{t('session.new')}</span>}
           </span></span>
           {wide && newShortcut !== undefined && newShortcut.keys.length > 0 && <span className={css.newSessionShortcut} aria-hidden="true">
@@ -303,13 +303,16 @@ export function SidebarRoot({
         })}
       </div>
 
-      {/* Footer actions stack above Settings in both sidebar widths. */}
+      {/* Footer actions stack above the Settings row. */}
       <div className={css.footArea}>
         <div className={css.footerActions}>
           {renderSlot('sidebar.footer.action', { wide })}
         </div>
-        <div className={css.settingsArea}>
-          {renderSlot('sidebar.settings', { wide })}
+        <div className={css.settingsRow}>
+          <div className={css.settingsArea}>
+            {renderSlot('sidebar.settings', { wide })}
+          </div>
+          {!windowsTitlebar || !collapsed ? toggle : null}
         </div>
       </div>
     </div>

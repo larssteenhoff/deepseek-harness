@@ -450,7 +450,7 @@ node apps/desktop/node_modules/pnpm/bin/pnpm.mjs --dir apps/desktop run test:upd
 
 仅向应用提供的 `dshOnboarding.hasApiKey()` preload 方法返回欢迎后端当前的 API Key 存在状态布尔值；原生登录与引导共用凭证发现逻辑，且只有受管理的应用主 frame 可以调用。
 
-登录会在系统浏览器中打开配置的平台页面。Host 负责 PKCE 和临时本机回调，在进入工作区前保存凭证，再将浏览器跳转到平台完成页。打开和复制的授权链接通过 `theme=light` 或 `theme=dark` 携带当前生效的 Desktop 主题；`system` 在执行操作时解析。即使平台页面随后批准，取消仍会撤销本地尝试。设置中的账号页面提供退出；没有独立 API Key 时，退出后返回欢迎窗。浏览器登录成功后，Welcome 切换到工作区但不激活应用；完成页的 dsh://open 链接负责将客户端置前。打包应用注册 dsh://open，只显示窗口而不传递凭证。macOS 开发启动器在 `.desktop-build/development` 下准备经临时签名的 `Harness Dev.app`，在 Info.plist 中声明 `dsh` 并注册到 Launch Services。它加载当前工作区，并记录选定的开发 home、浏览器数据路径和调试设置，以供冷启动使用。启动此应用会将其设为 `dsh://` 默认处理程序；启动打包应用会重新注册打包版处理程序。生成的应用包不包含账号 token，依赖工作区和已准备的运行环境继续存在。
+登录会在系统浏览器中打开配置的平台页面。Host 负责 PKCE 和临时本机回调，在进入工作区前保存凭证，再将浏览器跳转到平台完成页。打开和复制的授权链接通过 `theme=light` 或 `theme=dark` 携带当前生效的 Desktop 主题；`system` 在执行操作时解析。即使平台页面随后批准，取消仍会撤销本地尝试。设置中的账号页面提供退出；没有独立 API Key 时，退出后返回欢迎窗。浏览器登录成功后，Welcome 切换到工作区但不激活应用；完成页的 dsh://open 链接负责将客户端置前。打包应用注册 dsh://open，只显示窗口而不传递凭证。macOS 开发启动器在 `.desktop-build/development` 下准备经临时签名的 `Harness.app`，在 Info.plist 中声明 `dsh` 并注册到 Launch Services。它加载当前工作区，并记录选定的开发 home、浏览器数据路径和调试设置，以供冷启动使用。启动此应用会将其设为 `dsh://` 默认处理程序；启动打包应用会重新注册打包版处理程序。生成的应用包不包含账号 token，依赖工作区和已准备的运行环境继续存在。
 
 账号失效并返回 Welcome 时，主进程保留一次性通知，直到渲染器通过所属窗口的 IPC 领取。重新加载 Welcome 不会重复提示；主动退登和冷启动不会生成该通知。
 
