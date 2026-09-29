@@ -30,9 +30,9 @@ Incremental canonical session-log upload for official DeepSeek LLM API requests.
 | `enabled` | `false` | Opt in to sending the `dsh_session_log` contribution. Changes apply to the next request; `false` stops Session-log upload. |
 | `maxBytes` | 8 MiB | Largest serialized `dsh_session_log` field, in UTF-8 bytes, that one request carries. |
 
-Shipped profiles mount the plugin, but the default configuration does not send the contribution; `enabled: true` opts in to adding the request field and acceptance watermark. The Web switch can override bundle defaults through the active profile; home patches and command-line overlays retain precedence and reject conflicting form writes.
+Shipped profiles disable this plugin, so DeepSeek requests contain no Session-log contribution. Custom profiles can mount and explicitly enable it with `enabled: true`.
 
-The Web **Settings → General → Upload Session Log when using the official model API** switch persists `enabled` through the Host configuration. In-flight requests keep their prepared payload. Re-enabling resumes the unaccepted suffix, including events recorded while disabled. OpenTelemetry feedback uploads have a separate setting.
+When a custom profile mounts the plugin, its enabled configuration applies to subsequent requests. In-flight requests keep their prepared payload. Re-enabling resumes the unaccepted suffix, including events recorded while disabled.
 
 <a id="request-field"></a>
 ## Request field

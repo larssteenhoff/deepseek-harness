@@ -27,7 +27,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-当部署方需要通过 OpenTelemetry 日志导出会话记录时挂载此插件。选择一个模式、给导出器一个端点，并决定是否在 seam 上挂载脱敏规则。
+随附 profile 会禁用此插件，也不会配置 DeepSeek collector。自定义部署如已选择遥测目的地，可通过显式模式和 collector URL 挂载插件。
 
 ### 模式
 
@@ -69,7 +69,7 @@ kind: "package-reference"
 
 ### 哪些数据会离开本机
 
-每条 Session 事件对应一个 `eventName: "session-log"` 记录。`attributes.sessionId` 是 collector 使用的 Session 身份；`attributes.content` 编码完整事件 envelope 和脱敏后的 `event.data`。保留的是 JSON 值，不保证原 JSONL 字节或键顺序相同。为现有消费者保留 `session.id`、`event.seq` 和 `event.type` 元数据。Resource 携带应用和匿名用户身份；scope 携带后端包名和版本。基础配置使用 `https://dsh-otel-collector.deepseeksvc.com/v1/logs`，可用 `DSH_TELEMETRY_OTLP_URL` 覆盖。不隐式添加 channel 头。
+每条 Session 事件对应一个 `eventName: "session-log"` 记录。`attributes.sessionId` 是 collector 使用的 Session 身份；`attributes.content` 编码完整事件 envelope 和脱敏后的 `event.data`。保留的是 JSON 值，不保证原 JSONL 字节或键顺序相同。为现有消费者保留 `session.id`、`event.seq` 和 `event.type` 元数据。Resource 携带应用和匿名用户身份；scope 携带后端包名和版本。随附 profile 不配置 collector 地址。自定义 profile 必须显式提供端点。不隐式添加 channel 头。
 
 共享 OTel 通道使用 SDK 的 OTLP JSON 序列化器对每条记录计量一次，包含其 resource/scope envelope，再按保守大小顺序组包。单条超限事件产生一次拒绝诊断且不截断。Session 日志不会与产品埋点混在一个请求中。捕获交接和关闭完成不代表 collector 确认。
 

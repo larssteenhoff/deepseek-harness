@@ -27,7 +27,7 @@ The adapter injects `otel`; the [shared OTel plugin](../../telemetry/otel/README
 <a id="use-this-package"></a>
 ## Use this package
 
-Mount this plugin when a deployment should export session records through OpenTelemetry logs. Choose a mode, give the exporter an endpoint, and decide whether to mount redaction rules on the seam.
+Shipped profiles disable this plugin and do not configure a DeepSeek collector. Custom deployments may mount it with an explicit mode and collector URL when they have chosen a telemetry destination.
 
 ### Modes
 
@@ -69,7 +69,7 @@ Model requests, request headers, Session creation or adoption, restoration, and 
 
 ### What leaves the machine
 
-Each Session event becomes one `eventName: "session-log"` record. `attributes.sessionId` is the collector Session identity; `attributes.content` encodes the complete event envelope with redacted `event.data`. JSON values are preserved, not the original JSONL bytes or key ordering. Legacy `session.id`, `event.seq`, and `event.type` metadata remain for existing consumers. Resources carry application and anonymous-user identity; scope carries the backend package name and version. The base profile uses `https://dsh-otel-collector.deepseeksvc.com/v1/logs`; `DSH_TELEMETRY_OTLP_URL` overrides it. No channel header is added implicitly.
+Each Session event becomes one `eventName: "session-log"` record. `attributes.sessionId` is the collector Session identity; `attributes.content` encodes the complete event envelope with redacted `event.data`. JSON values are preserved, not the original JSONL bytes or key ordering. Legacy `session.id`, `event.seq`, and `event.type` metadata remain for existing consumers. Resources carry application and anonymous-user identity; scope carries the backend package name and version. Shipped profiles do not configure a collector URL. Custom profiles must provide an explicit endpoint. No channel header is added implicitly.
 
 The shared OTel channel measures each record once with the SDK OTLP JSON serializer, including its resource/scope envelope, then greedily packs requests using those conservative sizes. A single oversized event produces one rejection diagnostic without truncation. Session logs never mix with product analytics in a request. Capture handoff and shutdown are not collector acknowledgements.
 

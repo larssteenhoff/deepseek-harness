@@ -9,6 +9,7 @@ import type { PlatformPage, PlatformPages } from './platform-pages.ts'
 import { formatBalance } from './formatBalance.ts'
 import { AccountAvatar } from './AccountAvatar.tsx'
 import { authorizeUrlWithTheme } from './authorize-url.ts'
+import { SignOutDialog } from './SignOutDialog.tsx'
 import type { BonusNotice } from './bonus-notices.ts'
 import css from './AccountSection.module.css'
 
@@ -81,7 +82,9 @@ export interface AccountSectionInjected {
 export type AccountSectionProps =
   PropsRuntime<'settings.section'> & PropsLocale<'settings.account'> & InjectFace<AccountSectionInjected>
 /** @param props - localized actions, account subscription, and the shared Platform page channel. @returns account settings UI. */
-export function AccountSection({ t, useAccount, useTheme, start, cancel, openPlatformPage }: AccountSectionProps) {
+export function AccountSection({
+  t, useAccount, useTheme, start, cancel, signOut, hasRunningAccountTasks, contactUs, openPlatformPage,
+}: AccountSectionProps) {
   const { view: state, details, failed: streamFailed } = useAccount(value => value)
   const colorScheme = useTheme(snapshot => snapshot.active.colorScheme)
   // The shared host owns the native view; this page holds only its own request,
@@ -89,6 +92,7 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
   const releasePage = useRef<(() => void) | undefined>(undefined)
   const [failed, setFailed] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [signOutImpact, setSignOutImpact] = useState<boolean | 'unknown'>()
   const profile = details?.profile?.status === 'ready' ? details.profile.value : undefined
   const wallets = details?.balance?.status === 'ready' ? details.balance.value : undefined
   const bonusWallets = details?.balance?.status === 'ready'
@@ -148,6 +152,11 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
         <Button variant="primary" className={css.signInButton} disabled={busy || state === undefined}
           onClick={() => { void run(start) }}>{t('signIn')}</Button>
       </div>
+      <div className={css.actions}>
+        <Button variant="outline" onClick={contactUs}>{t('contactUs')}</Button>
+      </div>
+      {signOutImpact !== undefined && <SignOutDialog running={signOutImpact} signOut={signOut}
+        close={() => { setSignOutImpact(undefined) }} t={t} />}
     </section>
   )
   return (
@@ -164,6 +173,14 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
           {t('accountInfo')}<IconRightUpOutlineRegular size={12} />
         </a>}
       </div>
+      {signedIn && <div className={css.actions}>
+        <Button variant="outline" onClick={contactUs}>{t('contactUs')}</Button>
+        <Button variant="outline" disabled={busy} onClick={() => {
+          setBusy(true)
+          void hasRunningAccountTasks().then(setSignOutImpact).catch(() => { setSignOutImpact('unknown') })
+            .finally(() => { setBusy(false) })
+        }}>{t('signOut')}</Button>
+      </div>}
       {active && <div className={css.actions}>
         {attempt.authorizeUrl && <a className={css.linkButton} href={authorizeUrlWithTheme(attempt.authorizeUrl, colorScheme)}
           target="_blank" rel="noreferrer">
@@ -211,6 +228,8 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
           </div>
         </div>
       </div>
+      {signOutImpact !== undefined && <SignOutDialog running={signOutImpact} signOut={signOut}
+        close={() => { setSignOutImpact(undefined) }} t={t} />}
     </section>
   )
 }

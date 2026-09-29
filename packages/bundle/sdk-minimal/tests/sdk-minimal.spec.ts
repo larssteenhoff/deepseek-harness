@@ -59,6 +59,9 @@ describe('dsh-sdk-minimal bundle', () => {
       ['persistent-pwsh', '@deepseek-ai/dsh-tool-pwsh-persistent'],
       ['sessions', '@deepseek-ai/dsh-session-persistence-jsonl'],
     ])
+    for (const id of ['session-log-deepseek', 'plugin-package-inventory-deepseek']) {
+      expect(rows.find(row => row.id === id)).toMatchObject({ disabled: true, config: { enabled: false } })
+    }
     expect(rows.find(row => row.id === 'sdk-app-startup')?.config).toEqual({ profile: 'sdk-minimal' })
     expect(rows.find(row => row.id === 'sdk-jsonrpc-server')).toMatchObject({
       inject: ['sdkAppStartup', 'loader'],

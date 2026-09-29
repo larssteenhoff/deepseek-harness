@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Desktop product analytics is disabled by default. Deployments can explicitly enable selected interaction reports through configuration; ordinary Web clients never submit these events, and missing login identity is omitted.
+The shipped Desktop and Web profiles disable product analytics, so interaction events are not sent to DeepSeek. Ordinary Web clients have no collection capability.
 
 ## Table of Contents
 
@@ -21,9 +21,9 @@ Desktop product analytics is disabled by default. Deployments can explicitly ena
 <a id="use-this-package"></a>
 ## Use this package
 
-Desktop mounts Analytics and its required Telemetry exporter with the live `enabled` field defaulting to `false`. A deployment must explicitly set `enabled: true` through Cordis Config / settings to opt in; there is no user-facing control. Ordinary Web mounts neither service. Disabled collection reads no analytics identity and accepts no new events; the exporter remains mounted and may finish exporting records already queued. Session-feedback telemetry has its own policy.
+The shipped Web app disables both Analytics and its exporter in all profiles. Ordinary Web mounts neither service. UI actions use a no-op optional sender when the service is absent.
 
-The renderer and Electron subscribe to the Host policy through the existing authenticated stream, including reconnection. Electron also reads the initial policy before native launch reporting. Welcome obtains the current policy over IPC. The Host checks its current volatile configuration again at event intake and after identity lookup. `DSH_PRODUCT_ANALYTICS_OTLP_URL` overrides the export destination for isolated collectors. The [exporter](../../host/product-telemetry-otel/README.md) owns batching, retry, and shutdown delivery.
+The renderer and Electron subscribe to the Host policy through the existing authenticated stream, including reconnection. Electron also reads the initial policy before native launch reporting. Welcome obtains the current policy over IPC. The Host checks its current volatile configuration again at event intake and after identity lookup. Custom compositions must provide a collector endpoint explicitly. The [exporter](../../host/product-telemetry-otel/README.md) owns batching, retry, and shutdown delivery.
 
 Common fields are `device_id`, `user_id`, `os_version`, and `app_version`. Device identity reuses the existing login record without generating one. The Host reads credential-free device, account, and OS fields through `deepseekAccount.getDeviceIdentity()`. Missing values are omitted; API keys, account tokens, prompts, and responses are never event fields.
 

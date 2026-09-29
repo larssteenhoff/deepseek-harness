@@ -162,6 +162,10 @@ describe('explicit product telemetry', () => {
     expect(ctx.get('productTelemetry')).toBeUndefined()
   })
 
+  it('requires an explicit collector URL instead of defaulting to DeepSeek telemetry', () => {
+    expect(() => Config({ serviceName: 'fixture', serviceVersion: '1' })).toThrow(/endpoint/)
+  })
+
   it.each([
     [{ endpoint: 'broken' }, 'endpoint must be a valid HTTP(S) URL'],
     [{ channel: 'bad\nchannel' }, 'channel must be a valid HTTP header value'],

@@ -58,7 +58,7 @@ The onboarding ledger projects in ascending order and mounts exactly one step at
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
 
-The shell declares settings.launcher for an account-owned sidebar menu and retains the Settings button as its fallback. The launcher receives settingsOpen, whose false-to-true edge marks one Settings entry, so a registrant acts once per entry instead of on every re-render inside one open. Closing the dialog returns focus to the active launcher.
+The shell declares settings.launcher for an account-owned direct Settings button. The launcher receives settingsOpen, whose false-to-true edge marks one Settings entry, so a registrant acts once per entry instead of on every re-render inside one open. Closing the dialog returns focus to the active launcher.
 
 <details>
 <summary>Implementation internals — click to expand</summary>

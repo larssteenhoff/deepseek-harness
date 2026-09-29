@@ -51,10 +51,13 @@
   min-height: auto;
 }
 
-/* Message column: shared chat width (ConversationRoot --dsh-chat-content-width),
-   centered on the same axis as the input box (which caps at chat + 16px); the
-   scroller itself stays full-bleed. */
+/* Message column: shared chat width (ConversationRoot --dsh-chat-content-width).
+   Nudge it to the composer's visible left edge; the scroller stays full-bleed. */
 .column {
+  /* The composer card has a 20px greater visible left inset; carry the
+     transcript with it so replies and the input share an edge across widths. */
+  position: relative;
+  left: 20px;
   max-width: var(--dsh-chat-content-width);
   width: 100%;
   margin: 0 auto;

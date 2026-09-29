@@ -30,9 +30,9 @@ kind: "package-reference"
 | `enabled` | `false` | 选择启用 `dsh_session_log` 贡献。修改从下一次请求生效；设为 `false` 可停止会话日志上传。 |
 | `maxBytes` | 8 MiB | 单次请求携带的 `dsh_session_log` 字段序列化后的最大 UTF-8 字节数。 |
 
-随附 profile 会挂载该插件，但默认配置不会发送贡献；`enabled: true` 才会选择添加请求字段和接受水位。Web 开关可通过当前 profile 覆盖组合包默认值；home patch 和命令行 overlay 保持更高优先级，会拒绝与其冲突的表单写入。
+随附 profile 会禁用该插件，因此 DeepSeek 请求不包含 Session Log 贡献。自定义 profile 可挂载插件并通过 `enabled: true` 显式启用。
 
-Web **设置 → 通用 → 在使用官方模型 API 时上传 Session Log** 开关通过 Host 配置持久化 `enabled`。进行中的请求保留已准备的载荷。重新开启后继续上传尚未确认的后缀，包括关闭期间记录的事件。OpenTelemetry 反馈上传使用独立设置。
+自定义 profile 挂载插件后，启用配置会作用于后续请求。进行中的请求保留已准备的载荷。重新启用后会继续发送尚未确认的后缀，包括禁用期间记录的事件。
 
 <a id="request-field"></a>
 ## 请求字段

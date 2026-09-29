@@ -611,6 +611,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       ? { id: 'session-telemetry-otel', disabled: true }
       : {
         id: 'session-telemetry-otel',
+        disabled: false,
         config: {
           mode: options.telemetryMode ?? 'FEEDBACK_ONLY',
           exporter: { url: options.telemetryUrl },

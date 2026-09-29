@@ -151,7 +151,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('DeepSeek Messages real API', () 
       if (specifier !== '@deepseek-ai/dsh-plugin-package-inventory-deepseek') throw new Error(`unexpected Loader import: ${specifier}`)
       return PluginPackageInventoryDeepSeek
     })
-    await ctx.loader.create({ name: '@deepseek-ai/dsh-plugin-package-inventory-deepseek' })
+    await ctx.loader.create({ name: '@deepseek-ai/dsh-plugin-package-inventory-deepseek', config: { enabled: true } })
     await ctx.loader.await()
     const packagePath = createRequire(import.meta.url).resolve('@deepseek-ai/dsh-plugin-package-inventory-deepseek/package.json')
     const packageIdentity = JSON.parse(await readFile(packagePath, 'utf8')) as { name: string; version: string }
