@@ -28,8 +28,10 @@ import { installModelSelectionProjection } from './model-selection-projection.ts
 import { SessionSkillCatalog } from './skill-catalog.ts'
 import { SessionMediaReferences } from './media-references.ts'
 import { ArchivedSessionGate } from './archived-session-gate.ts'
+import { readCodexWeeklyQuota } from './codex-quota.ts'
 import type {
   ModelCatalog,
+  CodexWeeklyQuota,
   SessionWorkspacePathApplication,
   SessionAttachmentRequest,
   SessionAttachmentValue,
@@ -64,6 +66,7 @@ import type {
 } from './types.ts'
 
 export type * from './types.ts'
+export type { CodexWeeklyQuota } from './types.ts'
 export { ApiSessionNotFound } from './agent.ts'
 export { SessionFileReferences } from './file-references.ts'
 export { SessionSkillCatalog } from './skill-catalog.ts'
@@ -309,6 +312,16 @@ export class SessionController extends TypertRemoteService {
   @Remote('modelCatalog')
   modelCatalog(): Promise<ModelCatalog> {
     return buildModelCatalog(this.ctx)
+  }
+
+  /**
+   * Read the signed-in OpenAI ChatGPT/Codex subscription's weekly quota.
+   * @returns remaining weekly percent and reset time, or null when the quota is unavailable.
+   */
+  @Remote('codexWeeklyQuota')
+  async codexWeeklyQuota(): Promise<CodexWeeklyQuota | null> {
+    try { return await readCodexWeeklyQuota() }
+    catch { return null }
   }
 
   /**

@@ -1276,6 +1276,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
+      '@openai/codex':
+        specifier: 0.153.4
+        version: 0.153.4
       mime-types:
         specifier: ^3.0.2
         version: 3.0.2

@@ -105,7 +105,8 @@
     "@deepseek-ai/dsh-util-time": "workspace:*",
     "@deepseek-ai/dsh-util-values": "workspace:*",
     "@deepseek-ai/dsh-util-workspace-path": "workspace:*",
-    "@deepseek-ai/dsh-workspace": "workspace:*"
+    "@deepseek-ai/dsh-workspace": "workspace:*",
+    "@openai/codex": "0.153.4"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-session-persistence": {

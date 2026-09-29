@@ -103,6 +103,13 @@ export interface ModelSelection {
   readonly reasoningEffort?: string
 }
 
+/** Weekly subscription quota exposed by the official Codex account endpoint. */
+export interface CodexWeeklyQuota {
+  readonly remainingPercent: number
+  /** Unix timestamp in seconds, when supplied by Codex. */
+  readonly resetsAt: number | null
+}
+
 /** Host fold state for durable model selection. */
 export interface ModelSelectionProjectionState {
   /** Selection consumed by the latest recorded model request. */

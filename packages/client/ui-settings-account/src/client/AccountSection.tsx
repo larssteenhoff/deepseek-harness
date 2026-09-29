@@ -59,6 +59,8 @@ export interface AccountSectionInjected {
    * @returns after both reads settle.
    */
   refreshAccount: () => Promise<void>
+  /** Read the signed-in ChatGPT/Codex subscription's weekly quota. */
+  readCodexWeeklyQuota?: () => Promise<{ readonly remainingPercent: number; readonly resetsAt: number | null } | null>
   /** Open the external support questionnaire with the account, build and environment sampled by this click. */
   contactUs: () => void
   /** Open or dismiss the login dialog. */

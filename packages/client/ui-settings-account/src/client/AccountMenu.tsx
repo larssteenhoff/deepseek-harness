@@ -14,7 +14,7 @@ export type AccountMenuProps = PropsRuntime<'settings.launcher'> & PropsLocale<'
 export function AccountMenu({
   subscribeSessionExpired, subscribeModelSignInRequired, wide, settingsShortcut, openSettings, settingsOpen,
   refreshAccount, showLogin, openOnboarding, start, cancel, bonusNoticeShown, bonusNoticeDismissed,
-  useAccount, useTheme, t,
+  readCodexWeeklyQuota, useAccount, useTheme, t,
 }: AccountMenuProps) {
   const anchor = useRef<HTMLDivElement>(null)
   const account = useAccount(state => state)
@@ -23,7 +23,19 @@ export function AccountMenu({
   useEffect(() => subscribeModelSignInRequired?.(() => { setSignInNotice(value => value + 1) }), [subscribeModelSignInRequired])
   const [expiryNotice, setExpiryNotice] = useState(false)
   useEffect(() => subscribeSessionExpired?.(() => { setExpiryNotice(true) }), [subscribeSessionExpired])
-  const trigger = useRef<HTMLButtonElement>(null)
+  const [weeklyQuota, setWeeklyQuota] = useState<{ readonly remainingPercent: number; readonly resetsAt: number | null } | null>(null)
+  useEffect(() => {
+    if (readCodexWeeklyQuota === undefined) return
+    let active = true
+    const refresh = () => {
+      void readCodexWeeklyQuota().then((value) => {
+        if (active) setWeeklyQuota(value)
+      }).catch(() => {})
+    }
+    refresh()
+    const interval = window.setInterval(refresh, 5 * 60_000)
+    return () => { active = false; window.clearInterval(interval) }
+  }, [readCodexWeeklyQuota])
   const signedIn = account.view?.status === 'credential-stored'
   const settingsWasOpen = useRef(false)
   useEffect(() => {
@@ -36,9 +48,14 @@ export function AccountMenu({
     {signedIn && account.notice && <AccountNoticeCard key={account.notice.orderId} notice={account.notice}
       anchor={anchor} title={t('bonusNoticeTitle')} closeLabel={t('close')}
       onShown={bonusNoticeShown} onDismiss={bonusNoticeDismissed} />}
-    <button ref={trigger} type="button" className={css.trigger} data-collapsed={!wide} data-row="true"
+    {wide && weeklyQuota !== null && <div className={css.quota}
+      title={weeklyQuota.resetsAt === null ? undefined : new Date(weeklyQuota.resetsAt * 1000).toLocaleString()}>
+      <span className={css.quotaLabel}>{t('openaiWeeklyUsage')}</span>
+      <span className={css.quotaValue}>{weeklyQuota.remainingPercent}% {t('remainingThisWeek')}</span>
+    </div>}
+    <button type="button" className={css.trigger} data-collapsed={!wide} data-row="true"
       aria-label={t('settings')} aria-keyshortcuts={settingsShortcut?.aria}
-      aria-haspopup="dialog" aria-expanded={settingsOpen} onClick={() => { openSettings(); trigger.current?.focus() }}>
+      aria-haspopup="dialog" aria-expanded={settingsOpen} onClick={openSettings}>
       <IconSettingsOutlineMedium size={16} />
       {wide && <span className={css.label}>{t('settings')}</span>}
       {wide && settingsShortcut !== undefined && settingsShortcut.keys.length > 0 && <span className={css.shortcut} aria-hidden="true">
