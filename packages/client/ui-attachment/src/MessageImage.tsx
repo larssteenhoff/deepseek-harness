@@ -82,11 +82,12 @@ function dimensionsOf(image: MessageImageSpec): { readonly width: number; readon
  * @param props.labels - resolved strings (tooltip, loading, retry, lightbox).
  * @returns the bounded thumbnail button, or the retry control on failure.
  */
-export function MessageImage({ image, load, variant, labels }: {
+export function MessageImage({ image, load, variant, labels, showResolution = false }: {
   image: MessageImageSpec
   load: ImageLoader
   variant: 'single' | 'tile' | 'thumbnail'
   labels: MessageImageLabels
+  showResolution?: boolean
 }) {
   const preview = 'preview' in image ? image.preview : undefined
   const attachment = 'attachment' in image ? image.attachment : undefined
@@ -141,24 +142,31 @@ export function MessageImage({ image, load, variant, labels }: {
   )
   return (
     <>
-      <button
-        type="button"
-        className={css.frame}
-        data-variant={variant}
-        style={fit === undefined ? undefined : { width: fit.width, height: fit.height }}
-        title={loadingThumbnail ? labels.loading : labels.open}
-        aria-label={loadingThumbnail ? labels.loading : labels.openNamed(label)}
-        aria-busy={loadingThumbnail || undefined}
-        onClick={() => { if (src !== null) setOpen(true) }}
-      >
-        {src === null
-          ? (
-            <span className={css.loading} aria-hidden={loadingThumbnail || undefined}>
-              {loadingThumbnail ? <IconLoadingOutlineRegular className={css.spinner} /> : labels.loading}
-            </span>
-          )
-          : <img src={src} alt={label} style={fit === undefined ? undefined : { objectPosition: fit.objectPosition }} />}
-      </button>
+      <div className={css.item}>
+        <button
+          type="button"
+          className={css.frame}
+          data-variant={variant}
+          style={fit === undefined ? undefined : { width: fit.width, height: fit.height }}
+          title={loadingThumbnail ? labels.loading : labels.open}
+          aria-label={loadingThumbnail ? labels.loading : labels.openNamed(label)}
+          aria-busy={loadingThumbnail || undefined}
+          onClick={() => { if (src !== null) setOpen(true) }}
+        >
+          {src === null
+            ? (
+              <span className={css.loading} aria-hidden={loadingThumbnail || undefined}>
+                {loadingThumbnail ? <IconLoadingOutlineRegular className={css.spinner} /> : labels.loading}
+              </span>
+            )
+            : <img src={src} alt={label} style={fit === undefined ? undefined : { objectPosition: fit.objectPosition }} />}
+        </button>
+        {showResolution && dimensions !== undefined && (
+          <span className={css.resolution}>
+            {dimensions.width} × {dimensions.height} px
+          </span>
+        )}
+      </div>
       {open && src !== null && <ImageLightbox src={src} alt={label} labels={labels.lightbox} onClose={close} />}
     </>
   )
@@ -185,6 +193,7 @@ export function ImageGallery({ images, load, align, compact = false, thumbnail =
           load={load}
           variant={variant}
           labels={labels}
+          showResolution={align === 'start' && variant === 'single'}
         />
       ))}
     </div>

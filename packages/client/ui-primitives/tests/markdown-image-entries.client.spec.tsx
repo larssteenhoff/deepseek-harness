@@ -63,6 +63,19 @@ it('opens inline images in the shared lightbox, restores focus, and never opens 
   expect(openFile).not.toHaveBeenCalled()
 })
 
+it('shows the loaded image resolution in a pill beneath the generated image', () => {
+  mount('![Generated](image.png)')
+  const image = screen.getByRole('img')
+  Object.defineProperties(image, {
+    naturalWidth: { configurable: true, value: 1536 },
+    naturalHeight: { configurable: true, value: 1024 },
+  })
+  fireEvent.load(image)
+  const resolution = screen.getByText('1536 × 1024 px')
+  expect(resolution.parentElement?.tagName).toBe('SPAN')
+  expect(resolution.previousElementSibling?.tagName).toBe('BUTTON')
+})
+
 it('loads a link preview only after hover dwell and keeps its existing sidebar activation', () => {
   vi.useFakeTimers()
   const { openFile } = mount('[View comparison](.artifacts/对比%20image.png)')

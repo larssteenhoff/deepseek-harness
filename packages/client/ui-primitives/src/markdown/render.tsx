@@ -649,15 +649,26 @@ function LoadedMarkdownImage({ src, alt, destination, preview }: {
 }): ReactNode {
   const [failed, setFailed] = useState(false)
   const [open, setOpen] = useState(false)
+  const [dimensions, setDimensions] = useState<{ readonly width: number; readonly height: number }>()
   const close = useCallback(() => { setOpen(false) }, [])
   if (failed) return <span className={css.imageAlt}>{preview === undefined ? '' : `${preview.labels.failed} · `}{alt || destination}</span>
   const img = <img className={css.image} src={src} alt={alt}
+    onLoad={(event) => {
+      const { naturalWidth: width, naturalHeight: height } = event.currentTarget
+      if (width > 0 && height > 0) setDimensions({ width, height })
+    }}
     onError={() => { setFailed(true) }} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
-  if (preview === undefined) return img
+  const resolution = dimensions === undefined ? null : (
+    <span className={css.imageResolution}>{dimensions.width} × {dimensions.height} px</span>
+  )
+  if (preview === undefined) return <span className={css.imageWithResolution}>{img}{resolution}</span>
   return <>
-    <button type="button" className={css.imageButton} title={preview.labels.open}
-      aria-label={alt ? `${preview.labels.open}: ${alt}` : preview.labels.open}
-      onClick={() => { setOpen(true) }}>{img}</button>
+    <span className={css.imageWithResolution}>
+      <button type="button" className={css.imageButton} title={preview.labels.open}
+        aria-label={alt ? `${preview.labels.open}: ${alt}` : preview.labels.open}
+        onClick={() => { setOpen(true) }}>{img}</button>
+      {resolution}
+    </span>
     {open && <ImageLightbox src={src} alt={alt} labels={preview.labels} onClose={close} />}
   </>
 }

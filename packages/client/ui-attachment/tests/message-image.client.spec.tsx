@@ -252,6 +252,17 @@ describe('MessageImage preview arm', () => {
 })
 
 describe('ImageGallery', () => {
+  it('shows a resolution pill below a standalone assistant image, but not user images', () => {
+    const load = vi.fn(() => new Promise<string>(() => {}))
+    const assistant = render(<ImageGallery images={[{ attachment }]} load={load} align="start" labels={labels} />)
+    const resolution = assistant.getByText('640 × 320 px')
+    expect(resolution).toBeTruthy()
+    expect(resolution.previousElementSibling?.tagName).toBe('BUTTON')
+    assistant.unmount()
+    const user = render(<ImageGallery images={[{ attachment }]} load={load} align="end" labels={labels} />)
+    expect(user.queryByText('640 × 320 px')).toBeNull()
+  })
+
   it('renders nothing without images and an aligned wrapping group with them', async () => {
     const load = vi.fn().mockResolvedValue('blob:gallery')
     const empty = render(<ImageGallery images={[]} load={load} align="start" labels={labels} />)
