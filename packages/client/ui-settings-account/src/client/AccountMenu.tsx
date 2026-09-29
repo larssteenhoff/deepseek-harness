@@ -58,9 +58,6 @@ export function AccountMenu({
       aria-haspopup="dialog" aria-expanded={settingsOpen} onClick={openSettings}>
       <IconSettingsOutlineMedium size={16} />
       {wide && <span className={css.label}>{t('settings')}</span>}
-      {wide && settingsShortcut !== undefined && settingsShortcut.keys.length > 0 && <span className={css.shortcut} aria-hidden="true">
-        {settingsShortcut.keys.map((key, index) => <kbd key={`${key}-${index}`}>{key}</kbd>)}
-      </span>}
     </button>
     {account.loginVisible && !account.onboarding && <SignInDialog account={account} colorScheme={colorScheme}
       start={start} cancel={cancel} t={t} close={() => { showLogin(false) }}

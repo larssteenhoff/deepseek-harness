@@ -600,6 +600,12 @@
   min-width: 0;
 }
 
+/* The panel glyph has a slightly higher optical center than the Settings glyph. */
+.root:not(.collapsed) .settingsRow > .toggle {
+  position: relative;
+  top: 7px;
+}
+
 .settingsArea,
 .footerActions {
   flex: none;
@@ -628,6 +634,7 @@
 
 .collapsed .settingsRow {
   flex-direction: column;
+  align-items: center;
   gap: 4px;
 }
 
