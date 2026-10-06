@@ -178,3 +178,5 @@ None; Conversation assembly and browser input state do not alter provider-side p
 None.
 
 </details>
+
+Queued-message panels align with the prompt pill, reserving the attachment button and gap on the left.

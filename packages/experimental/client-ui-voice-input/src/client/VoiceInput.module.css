@@ -1,6 +1,6 @@
 .trigger { width: 28px; padding: 0; flex: none; }
 .triggerAnchor { display: inline-flex; flex: none; }
-.captureRow { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; min-height: 34px; }
+.captureRow { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; min-height: 34px; box-sizing: border-box; padding-left: 26px; }
 .roundButton { width: 32px; height: 32px; padding: 0; border-radius: 50%; corner-shape: round; flex: none; background: var(--dsw-specific-selector); }
 .roundButton:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover-solid); }
 .waveform { display: block; flex: 1; width: 0; height: 24px; min-width: 24px; color: var(--dsw-alias-label-secondary); }

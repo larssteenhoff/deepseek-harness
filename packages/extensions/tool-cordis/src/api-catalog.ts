@@ -1975,6 +1975,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'provider-grouped models, the deployment default, and isolated provider failures.',
       },
       {
+        signature: '@Remote(\'codexWeeklyQuota\') async codexWeeklyQuota(): Promise<CodexWeeklyQuota | null>',
+        description: 'Read the signed-in OpenAI ChatGPT/Codex subscription\'s weekly quota.',
+        parameters: [],
+        returns: 'remaining weekly percent and reset time, or null when the quota is unavailable.',
+      },
+      {
         signature: '@Remote canOpenWorkspacePath(): boolean',
         description: 'Report whether this deployment can hand a Session workspace path to a native desktop.',
         parameters: [],
@@ -4759,6 +4765,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ClientArtifactBaseline',
     declaration: 'export interface ClientArtifactBaseline {\n    readonly path: string;\n    readonly mtimeMs: number;\n    readonly ctimeMs: number;\n    readonly size: number;\n}',
+  },
+  {
+    name: 'CodexWeeklyQuota',
+    declaration: 'export interface CodexWeeklyQuota {\n    readonly remainingPercent: number;\n    readonly resetsAt: number | null;\n}',
   },
   {
     name: 'CollectedOutput',

@@ -178,3 +178,5 @@ selector 必须是 owner currency 的纯函数。非 null 返回值作为 `match
 无。
 
 </details>
+
+排队消息面板与输入框对齐，在左侧为附件按钮及间距预留空间。

@@ -508,11 +508,18 @@ it('opens Account from the contributed sidebar launcher', () => {
   expect(renderSlot.mock.calls.filter(call => call[0] === 'settings.launcher').at(-1)?.[1]).toMatchObject({ settingsOpen: false })
 })
 
-it('shows the effective settings binding on focus and exposes it to assistive technology', () => {
-  mount({ shortcuts: [{ id: 'settings.open' as ShortcutCommandId, label: 'Open settings', aliases: [], keys: ['⌘', ','], aria: 'Meta+,', binding: { code: 'Comma', modifiers: ['meta'] }, modified: false, conflicts: [], issue: null }] })
+it('shows the effective settings binding on the compact rail without adding a wide-row hover label', () => {
+  const shortcut: ShortcutCatalogEntry = { id: 'settings.open' as ShortcutCommandId, label: 'Open settings', aliases: [], keys: ['⌘', ','], aria: 'Meta+,', binding: { code: 'Comma', modifiers: ['meta'] }, modified: false, conflicts: [], issue: null }
+  mount({ wide: true, shortcuts: [shortcut] })
   const trigger = screen.getByRole('button', { name: 'Settings' })
   expect(trigger.getAttribute('aria-keyshortcuts')).toBe('Meta+,')
   fireEvent.focus(trigger)
+  expect(screen.queryByRole('tooltip')).toBeNull()
+
+  cleanup()
+  mount({ wide: false, shortcuts: [shortcut] })
+  const railTrigger = screen.getByRole('button', { name: 'Settings' })
+  fireEvent.focus(railTrigger)
   expect(screen.getByRole('tooltip').getAttribute('aria-label')).toBe('Settings ⌘ ,')
 })
 

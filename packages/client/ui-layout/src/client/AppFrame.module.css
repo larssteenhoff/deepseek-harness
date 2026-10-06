@@ -89,6 +89,14 @@
   --dsh-frame-top-clearance: 48px;
 }
 
+/* Native macOS title bars already consume their own chrome area; the page
+   starts below it, so no renderer clearance or overlay inset is needed. */
+:global(html[data-platform='darwin'][data-native-titlebar]) {
+  --dsh-frame-top-clearance: 0px;
+  --dsh-frame-overlay-top: 20px;
+  --dsh-frame-chrome-top: 0px;
+}
+
 /* In-frame Windows content already clears the caption through .frame padding. */
 :global(html[data-windows-titlebar]) {
   --dsh-frame-top-clearance: var(--dsh-windows-titlebar-height);

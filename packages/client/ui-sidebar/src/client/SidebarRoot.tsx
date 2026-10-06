@@ -210,8 +210,7 @@ export function SidebarRoot({
       }}
       onPointerLeave={() => { armLinger() }}
     >
-      {/* macOS hiddenInset titlebar: the strip shares the row with the
-          traffic lights and keeps the toggle at the sidebar's top-right. */}
+      {/* Renderer-owned titlebar only; native macOS chrome supplies its own row. */}
       {darwinDesktop && <div className={css.topStrip} data-window-drag />}
       {windowsTitlebar && collapsed && <div className={css.windowToggle}>{toggle}</div>}
       <div className={css.logoRow} data-window-drag>

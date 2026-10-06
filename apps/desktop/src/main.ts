@@ -215,16 +215,11 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
       titleBarOverlay: { height: WINDOWS_TITLEBAR_HEIGHT, color: chromeFallbackFill(),
         symbolColor: nativeTheme.shouldUseDarkColors ? '#f9fafb' : '#0f1115' },
     } : {}),
-    // hiddenInset places traffic lights inside the sidebar; sidebar vibrancy
-    // needs a transparent window background to show through the page.
+    // Use the native macOS title bar so traffic lights, title, and window
+    // controls stay in the standard system chrome instead of a renderer strip.
     ...(process.platform === 'darwin' ? {
-      titleBarStyle: 'hiddenInset' as const,
-      trafficLightPosition: { x: 16, y: 18 },
-      vibrancy: 'sidebar' as const,
-      // 'active' keeps the vibrancy material stable when the window blurs;
-      // 'followWindow' washes the sidebar out behind an unfocused window.
-      visualEffectState: 'active' as const,
-      backgroundColor: '#00000000',
+      titleBarStyle: 'default' as const,
+      backgroundColor: chromeFallbackFill(),
     } : {}),
     webPreferences: {
       preload,
@@ -250,28 +245,6 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
     // Reloads and navigations re-register the preload listener; resend the
     // current state so a fullscreen reload does not fall back to windowed CSS.
     window.webContents.on('did-finish-load', sendFullscreen)
-  }
-  if (process.platform === 'darwin') {
-    // Deminiaturize reattaches the NSVisualEffectView material late
-    // (electron/electron#25368), so a transparent window shows the desktop
-    // through the sidebar until then. Paint an opaque base while minimized or
-    // hidden so the deminiaturize animation and the reattachment gap show a
-    // solid fill; restoring flips back, and the null -> 'sidebar' transition
-    // forces the material to reattach.
-    const applyBackdrop = (): void => {
-      if (window.isDestroyed()) return
-      if (window.isMinimized() || !window.isVisible()) {
-        window.setVibrancy(null)
-        window.setBackgroundColor(chromeFallbackFill())
-      } else {
-        window.setVibrancy('sidebar')
-        window.setBackgroundColor('#00000000')
-      }
-    }
-    window.on('minimize', applyBackdrop)
-    window.on('hide', applyBackdrop)
-    window.on('restore', applyBackdrop)
-    window.on('show', applyBackdrop)
   }
   window.webContents.on('context-menu', (_event, { isEditable, selectionText, editFlags }) => {
     const items: MenuItemConstructorOptions[] = []

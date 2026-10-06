@@ -237,7 +237,7 @@ it.each([false, true])('opens the workspace on startup without welcome onboardin
   expect(state.loadWorkspace).not.toHaveBeenCalled()
   expect(state.showWorkspace).toHaveBeenCalledTimes(4)
   expect(state.windowOptions).toMatchObject({
-    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 18 }, vibrancy: 'sidebar' } : {}),
+    ...(process.platform === 'darwin' ? { titleBarStyle: 'default' } : {}),
     webPreferences: { contextIsolation: true, sandbox: true },
   })
   expect(state.closeWelcome).toHaveBeenCalledOnce()

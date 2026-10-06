@@ -766,6 +766,8 @@ The backends that consume this contract are on [persistence.md](persistence.md).
 
 The optional `application` selects a registered file handler without changing the system default; `workspacePathApplications({ path })` returns current handlers, names, icons, and default selection after Host path verification.
 
+`CodexWeeklyQuota` reports the remaining weekly Codex allowance as `remainingPercent` and its optional reset time as `resetsAt` (Unix seconds). `sessionController.codexWeeklyQuota()` returns `null` when the local Codex allowance cannot be read.
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -837,6 +839,12 @@ inspect( sessionId: SessionId, signal?: AbortSignal, ): Promise<SessionInspectio
  * @returns provider-grouped models, the deployment default, and isolated provider failures.
  */
 @Remote('modelCatalog') modelCatalog(): Promise<ModelCatalog>
+
+/**
+ * Read the signed-in OpenAI ChatGPT/Codex subscription's weekly quota.
+ * @returns remaining weekly percent and reset time, or null when the quota is unavailable.
+ */
+@Remote('codexWeeklyQuota') async codexWeeklyQuota(): Promise<CodexWeeklyQuota | null>
 
 /**
  * Report whether this deployment can hand a Session workspace path to a native desktop.

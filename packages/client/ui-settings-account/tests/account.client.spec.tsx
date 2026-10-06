@@ -134,7 +134,7 @@ it.each([en, zh].flatMap(copy => ([false, true, 'unknown'] as const).map(running
   expect(signOut).toHaveBeenCalledOnce()
 })
 
-it.each([en, zh])('shows the Settings shortcut on its direct sidebar button', async (copy) => {
+it.each([en, zh])('exposes the Settings shortcut accessibly without adding footer keycaps', async (copy) => {
   const operations = mount({ status: 'signed-out', attempt: null }, copy)
   cleanup()
   const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
@@ -149,11 +149,11 @@ it.each([en, zh])('shows the Settings shortcut on its direct sidebar button', as
   const view = render(<AccountMenu {...props} settingsShortcut={{ keys: ['⌘', ','], aria: 'Meta+,' }} />)
   const settings = screen.getByRole('button', { name: copy.settings })
   expect(settings.getAttribute('aria-keyshortcuts')).toBe('Meta+,')
-  expect([...settings.querySelectorAll('kbd')].map(key => key.textContent)).toEqual(['⌘', ','])
+  expect(settings.querySelector('kbd')).toBeNull()
 
   view.rerender(<AccountMenu {...props} settingsShortcut={{ keys: ['Ctrl', 'Shift', 'S'], aria: 'Control+Shift+S' }} />)
   expect(settings.getAttribute('aria-keyshortcuts')).toBe('Control+Shift+S')
-  expect([...settings.querySelectorAll('kbd')].map(key => key.textContent)).toEqual(['Ctrl', 'Shift', 'S'])
+  expect(settings.querySelector('kbd')).toBeNull()
 
   view.rerender(<AccountMenu {...props} />)
   expect(settings.hasAttribute('aria-keyshortcuts')).toBe(false)

@@ -17,7 +17,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react'
 import clsx from 'clsx'
 import {
-  IconPlusOutlineMedium, IconWarningOutlineRegular, Toast, Tooltip,
+  IconCloseOutlineRegular, IconPlusOutlineMedium, IconWarningOutlineRegular, Toast, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: the `plan` projection key merge (the TodoDock posture — the
 // composer reads a host-computed value; the domain owns the key).
@@ -321,6 +321,13 @@ export const InputBar = memo(function InputBar({
     if (!empty && !disabled && !machineBusy && !uploadsPending) keyboard.submit(primarySubmitMode, 'click')
   }
 
+  const onClearDraft = (): void => {
+    if (inputActions === undefined) return
+    for (const attachment of attachments) inputActions.removeAttachment(attachment.id)
+    inputActions.setDraft('')
+    if (editor !== null) focusDraftEditor(editor, revealSelection)
+  }
+
   // Claim ghost hint: rendered by CSS as generated content after the last
   // paragraph while the claim's args are blank (a hint implies a single-line
   // token draft). The translated per-command hint wins over the claim's own.
@@ -380,7 +387,7 @@ export const InputBar = memo(function InputBar({
         onPointerDown={workspaceTrigger ? (e) => { e.stopPropagation() } : undefined}
       >
         <div className={css.inputLine}>
-          <div className={css.inputTools} hidden={activity}>
+          <div className={css.inputTools}>
             <Tooltip label={t('input.commands')} side="top" delayMs={500}>
               <button
                 type="button"
@@ -433,6 +440,18 @@ export const InputBar = memo(function InputBar({
               hint={hint}
               showPlaceholder={draft === '' && attachments.length === 0 && !claimActive}
             />
+            <Tooltip label={t('input.clear')} side="top" delayMs={500} disabled={empty}>
+              <button
+                type="button"
+                className={css.clear}
+                aria-label={t('input.clear')}
+                hidden={empty}
+                onMouseDown={keepFocus}
+                onClick={onClearDraft}
+              >
+                <IconCloseOutlineRegular size={14} />
+              </button>
+            </Tooltip>
             <Tooltip
               label={primaryStops ? t('input.stop') : primaryLabel}
               shortcutKeys={primaryStops ? stopKeys : undefined}

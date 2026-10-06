@@ -467,6 +467,27 @@
 .sendPrimary { right: 8px; }
 .stopPrimary { right: 44px; }
 
+.clear {
+  position: absolute;
+  top: 50%;
+  right: 50px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.clear[hidden] { display: none; }
+.clear:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+.inputPillWithStop .clear { right: 86px; }
+
 .primary:hover:not(:disabled) {
   background: var(--dsw-alias-button-info-hover);
 }
@@ -490,6 +511,6 @@
 .standardControls { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .tools[hidden], .standardControls[hidden] { display: none; }
 .trailingActive { flex: 1; margin-left: 0; }
-.activity { display: flex; align-items: center; flex: none; }
+.activity { display: flex; align-items: center; flex: none; min-height: 34px; }
 .activity:empty { display: none; }
-.activityExpanded { flex: 1; min-width: 0; }
+.activityExpanded { display: flex; align-items: center; flex: 1; min-width: 0; min-height: 34px; }

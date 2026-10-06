@@ -770,6 +770,8 @@ interface TurnEndReasonMap {
 
 可选的 `application` 指定文件关联应用，不修改系统默认值；`workspacePathApplications({ path })` 在校验 Host 路径后返回当前关联应用、名称、图标和默认项。
 
+`CodexWeeklyQuota` 通过 `remainingPercent` 返回 Codex 每周剩余额度，通过 `resetsAt` 返回可选的重置时间（Unix 秒）。无法读取本地 Codex 额度时，`sessionController.codexWeeklyQuota()` 返回 `null`。
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -841,6 +843,12 @@ inspect( sessionId: SessionId, signal?: AbortSignal, ): Promise<SessionInspectio
  * @returns provider-grouped models, the deployment default, and isolated provider failures.
  */
 @Remote('modelCatalog') modelCatalog(): Promise<ModelCatalog>
+
+/**
+ * Read the signed-in OpenAI ChatGPT/Codex subscription's weekly quota.
+ * @returns remaining weekly percent and reset time, or null when the quota is unavailable.
+ */
+@Remote('codexWeeklyQuota') async codexWeeklyQuota(): Promise<CodexWeeklyQuota | null>
 
 /**
  * Report whether this deployment can hand a Session workspace path to a native desktop.

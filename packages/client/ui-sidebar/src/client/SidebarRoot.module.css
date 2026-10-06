@@ -232,6 +232,15 @@
   overflow: hidden;
 }
 
+/* The native macOS title bar already owns the window chrome. When the local
+   brand is hidden, keep only a compact breathing space above New Session. */
+:global([data-native-titlebar]) .logoRow {
+  height: 24px;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-bottom: 4px;
+}
+
 /* When both brand slots resolve empty (for example, a brand-removal plugin),
    collapse the now-vacant row along with the brand button so it does not leave
    a logo-sized blank above New Session. */
@@ -364,18 +373,13 @@
   border-radius: var(--dsw-radius-md);
 }
 
-/* Rail logo swap: collapsed, the toggle rests as the whale mark (brand ink,
-   no hover circle) and hovering reveals the panel icon — the expand
-   affordance (figma sidebar-hover flow). Expanded it is a plain panel icon. */
+/* The collapsed rail keeps the open-sidebar control visible at rest so the
+   affordance does not depend on hover. */
 .collapsed .toggle .panelIcon {
-  display: none;
-}
-
-.collapsed .toggle:hover .panelIcon {
   display: inline;
 }
 
-.collapsed .toggle:hover .railMark {
+.collapsed .toggle .railMark {
   display: none;
 }
 
