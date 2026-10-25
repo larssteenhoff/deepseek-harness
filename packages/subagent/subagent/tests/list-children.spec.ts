@@ -1,3 +1,5 @@
+import { subagentCatalogProjectionDefinition } from '../src/catalog.ts'
+import { mountWorkingDirectoryFixture } from './working-directory-fixture.ts'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -8,7 +10,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import SessionStore, { SESSION_FORMAT_VERSION, SessionId } from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { generationLogPath } from '../../../session/session-persistence-jsonl/src/format.ts'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
@@ -16,8 +18,9 @@ import type { SubagentCatalogEntry } from '@deepseek-ai/dsh-subagent'
 import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
 import * as SubagentFork from '@deepseek-ai/dsh-subagent-fork-in-process'
 import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
-import { TestSessionQuery } from './test-session-query.ts'
+import { startTestActivation } from './local-activation.ts'
 import { seedStoredSession } from './persistence-helpers.ts'
+import { TestSessionQuery } from './test-session-query.ts'
 
 type Script = ConstructorParameters<typeof MockAdapter>[0]
 
@@ -46,6 +49,8 @@ async function setup(
   persistenceDisposers.push(() => persistence.dispose())
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(TestSessionQuery)
+  await mountWorkingDirectoryFixture(ctx)
+  if (ctx.get('sessionProjections') === undefined) await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
   await ctx.plugin(SubagentFork, { providerName: 'fork' })
@@ -68,7 +73,7 @@ async function startChild(
   parent: Agent,
   label: string,
 ): Promise<SessionId> {
-  const started = await ctx.subagents.startContinuable({
+  const started = await ctx.subagents.startActivation({ delivery: 'parent',
     provider: 'spawn',
     label,
     request: { prompt: [{ type: 'text', text: `task: ${label}` }], parent },
@@ -110,24 +115,26 @@ describe('SubagentRuntime.listChildren', () => {
     }
   })
 
-  it('lists provider-established children from the parent catalog without a corpus or child read', async () => {
+  it('lists settled local children for both delivery modes without corpus or child reads', async () => {
     const { ctx, parent } = await setup([textResponse('once'), textResponse('again')])
-    const oneShot = await ctx.subagents.start('spawn', {
+    const callerOwned = await startTestActivation(ctx, 'spawn', {
       prompt: [{ type: 'text', text: 'finish once' }],
       agentOptions: { model: 'child-model' },
       parent,
       signal: testSignal,
     })
-    const oneShotId = oneShot.id
-    await oneShot.result
-    await oneShot.dispose()
+    expect(await ctx.subagents.listChildren(parent.id)).toMatchObject([
+      { id: callerOwned.childId, label: 'spawn', mode: 'continuable' },
+    ])
+    await callerOwned.result
+    await callerOwned.dispose()
     const continuableId = await startChild(ctx, parent, 'continuable child')
     const listSessions = vi.spyOn(ctx.sessionQuery, 'listSessions')
     const observeSession = vi.spyOn(ctx.sessionQuery, 'observeSession')
 
     const children = await ctx.subagents.listChildren(parent.id)
     expect(children.map(({ createdAt: _createdAt, ...child }) => child)).toEqual([
-      { id: oneShotId, mode: 'one-shot' },
+      { id: callerOwned.childId, label: 'spawn', mode: 'continuable' },
       { id: continuableId, label: 'continuable child', mode: 'continuable' },
     ])
     expect(children.every(child => Number.isFinite(child.createdAt))).toBe(true)
@@ -185,6 +192,8 @@ describe('SubagentRuntime.listChildren', () => {
     await ctx.plugin(SessionStore)
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(TestSessionQuery)
+    await mountWorkingDirectoryFixture(ctx)
+    if (ctx.get('sessionProjections') === undefined) await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SubagentRuntime)
     const ancestor = ctx.sessions.create(SessionId('catalog-ancestor'))
     ancestor.append('turn/start', { turn: 1 })
@@ -214,6 +223,8 @@ describe('SubagentRuntime.listChildren', () => {
     await ctx.plugin(SessionStore)
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(TestSessionQuery)
+    await mountWorkingDirectoryFixture(ctx)
+    if (ctx.get('sessionProjections') === undefined) await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SubagentRuntime)
     const parent = ctx.sessions.create(SessionId('chunk-parent'))
     for (let index = 0; index < 1_001; index += 1) {
@@ -228,7 +239,8 @@ describe('SubagentRuntime.listChildren', () => {
       })
     }
     const listSessions = vi.spyOn(ctx.sessionQuery, 'listSessions')
-    const state = ctx.sessionProjections.stateOf(parent, 'subagentCatalog')
+    const projection = await ctx.sessionProjections.register(subagentCatalogProjectionDefinition)
+    const state = projection.stateOf(parent)
     const chunkLengths: number[] = []
     for (let chunk = state?.head; chunk !== undefined; chunk = chunk.previous) {
       chunkLengths.push(chunk.values.length)
@@ -245,6 +257,8 @@ describe('SubagentRuntime.listChildren', () => {
   it('fails loud when the query service is unavailable', async () => {
     const withoutProjection = new Context()
     await withoutProjection.plugin(SessionStore)
+    await mountWorkingDirectoryFixture(withoutProjection)
+    await withoutProjection.plugin(SessionProjectionRegistry)
     await withoutProjection.plugin(SubagentRuntime)
     const parent = withoutProjection.sessions.create(SessionId('parent'))
     await expect(withoutProjection.subagents.listChildren(parent.id)).rejects.toMatchObject({
@@ -258,15 +272,35 @@ describe('SubagentRuntime.listChildren', () => {
 /** Add discovery facts without requiring a child descriptor. */
 function catalog(parent: Session, children: SubagentCatalogEntry[]): void {
   for (const { id, createdAt, ...identity } of children) {
-    parent.append('subagent/catalog', { version: 1, childId: id, childCreatedAt: createdAt, ...identity })
+    parent.append('subagent/catalog', identity.mode === 'external'
+      ? { version: 2, childId: id, childCreatedAt: createdAt, ...identity }
+      : { version: 1, childId: id, childCreatedAt: createdAt, ...identity })
   }
 }
 
-function child(id: string, mode: 'one-shot' | 'continuable' | 'unknown' = 'continuable'): SubagentCatalogEntry {
+function child(id: string, mode: SubagentCatalogEntry['mode'] = 'continuable'): SubagentCatalogEntry {
   return { id: SessionId(id), createdAt: 1, mode, label: id }
 }
 
 describe('SubagentRuntime.listDescendants', () => {
+  it('lists external entries as leaves without observing a nonexistent child Session', async () => {
+    const { ctx, parent } = await setup([])
+    const local = ctx.sessions.create(SessionId('local-child'))
+    catalog(parent.session, [child('external-child', 'external'), child('local-child')])
+    catalog(local, [child('nested-external', 'external')])
+    const observe = vi.spyOn(ctx.sessionQuery, 'observeSession')
+
+    expect(await ctx.subagents.listDescendants(parent.id)).toEqual([
+      { kind: 'child', id: SessionId('external-child'), mode: 'external', label: 'external-child',
+        activity: 'inactive', hasChildren: false, parentId: parent.id, depth: 1 },
+      { kind: 'child', id: local.id, mode: 'continuable', label: 'local-child',
+        activity: 'running', hasChildren: true, parentId: parent.id, depth: 1 },
+      { kind: 'child', id: SessionId('nested-external'), mode: 'external', label: 'nested-external',
+        activity: 'inactive', hasChildren: false, parentId: local.id, depth: 2 },
+    ])
+    expect(observe.mock.calls.map(([id]) => id)).toEqual([parent.id, local.id])
+  })
+
   it('walks parent catalogs in event order without enumerating unrelated Sessions or reading descriptors', async () => {
     const { ctx, parent } = await setup([])
     const branch = ctx.sessions.create(SessionId('branch'))
@@ -412,6 +446,8 @@ describe('SubagentRuntime.listDescendants', () => {
 
   it('fails before reading when the Session store or query service is absent', async () => {
     const ctx = new Context()
+    await mountWorkingDirectoryFixture(ctx)
+    if (ctx.get('sessionProjections') === undefined) await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SubagentRuntime)
     await expect(ctx.subagents.listDescendants(SessionId('root'))).rejects.toMatchObject({ code: 'SUBAGENT_CONTROL_SESSION_STORE_UNAVAILABLE' })
     await ctx.plugin(SessionStore)

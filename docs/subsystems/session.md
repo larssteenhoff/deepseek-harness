@@ -65,8 +65,10 @@ interface SessionEventMap {
    * The rendered system prompt on the model-visible surface. The loop appends
    * the first one as surface node 0 before the step's first `user/message`.
    * A prepared in-history route can append nonempty changes in a continuing
-   * series. An incapable route or new series normalizes text to the first system
-   * node. Normalization empties nonempty later nodes, then rewrites the head if
+   * series. An incapable route, or a new series whose effective text differs,
+   * normalizes text to the first system node; a series start whose latest
+   * surviving node already holds the rendering leaves it in place.
+   * Normalization empties nonempty later nodes, then rewrites the head if
    * needed, through logged per-node replacements. An empty rendering always
    * clears all active system nodes, leaving no older instructions model-visible.
    * Empty later nodes are dormant and project to no message; an empty head with
@@ -578,6 +580,9 @@ declare class Session {
    * the log, the append is committed: observer failures are logged and
    * contained per listener, so they do not change the return value or prevent
    * later listeners from observing the same accepted event.
+   * Independent Sessions append without notifying store observers. Once a store
+   * prepares or enters the instance, writes require a completed creation
+   * announcement and remain disabled after removal.
    *
    * @param type - The event type (key of {@link SessionEventMap}).
    * @param data - The event payload; must be JSON-serializable.
@@ -593,7 +598,9 @@ declare class Session {
    * @returns the logged event — its assigned `seq`/`time` plus the SNAPSHOT of
    *   `data` that entered the log, so reading `event.data` back sees the logged
    *   value, never the caller's still-mutable input.
-   * @throws if `data` or surface metadata is not losslessly JSON-serializable
+   * @throws if a store-owned Session is unentered or its creation announcement
+   *   has not completed, or if `data` or surface
+   *   metadata is not losslessly JSON-serializable
    *   (BigInt, function, symbol, undefined, negative zero, non-finite number,
    *   circular reference, sparse array, or an exotic object such as
    *   Map/Set/Date/class instance), or when the candidate violates the
@@ -678,7 +685,7 @@ Everything else (`turn/*`, `step/*`, `assistant/attempt`, plugin-owned `llm/retr
 
 `ctx.sessions.create(id, { seed, meta })` is the low-level replay/fork primitive. For ordinary live-session forks, `SessionStore` exposes one policy API:
 
-- `fork(source, boundary?, childSessionId?)` accepts a live `Session` object or live `SessionId`, selects source events through the inclusive `SessionSeq` boundary (default: current last event), requires the selected prefix to end outside an open turn, then creates a live child session with deep-cloned seed events, `parentSession`, `isSeeded: true`, the exact `inheritedEventCount`, and inherited `cwd`.
+- `fork(source, boundary?, childSessionId?)` accepts a live `Session` object or live `SessionId`, selects source events through the inclusive `SessionSeq` boundary (default: current last event), closes any open tail, then creates an independent live session with deep-cloned seed events, `isSeeded: true`, the exact `inheritedEventCount`, and inherited `cwd`, without `parentSession`.
 
 An explicit `boundary` lets callers fork from any stable between-turn position, including a previous `turn/end` or a later standalone log-only event, even if the source has newer events or an open current turn. The API rejects a prefix that ends inside an open turn instead of clipping silently. `dsh-subagent-fork-in-process` keeps its completed-prefix clipping because tool-time delegation usually starts while the parent turn is open; ordinary session branching should make the requested boundary explicit.
 
@@ -703,8 +710,9 @@ interface TurnEndReasonMap {
   blocked: { kind: 'blocked' }
   /**
    * The turn failed. `error` is always a structured failure: the `LlmError`
-   * facts verbatim, or `{ message: errorChain(error), code: 'UNKNOWN' }`
-   * flattened from any other error.
+   * facts verbatim, or `{ message: errorChain(error), code }` flattened from
+   * any other error, where `code` is `TOOL_ACTIVATION_FAILED` for a failed
+   * tool condition and `UNKNOWN` otherwise.
    */
   error: { kind: 'error'; error: LlmFailure }
   /** At least one step reached its output-token ceiling, even if a plugin continued the turn. */
@@ -752,6 +760,49 @@ When several events in one plugin-owned family assemble into one Web Client Conv
 
 The hook bridges' `hook/invoked` / `hook/result` pairs (from `@deepseek-ai/dsh-hook-protocol`) correlate by `handlerId`. `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, and `Stop` fire inside the loop's open turn, so their `hook/*` records are turn-enclosed by construction. `SessionStart` gets no `hook/*` record because it runs before turn 1; its context remains pending in the inbox until a waking delivery opens a turn.
 
+### Plugin records
+
+Experimental packages declare plugin-owned state in `PluginRecordMap`: `appendPluginRecord()` uses each declaration to type its name and payload, and appends an event marked `ignorable: true` in the `plugin:` namespace. `pluginRecordOf()` reads stored records with unknown payloads regardless of current declarations. The [experimental persistence catalog](../experimental-persistence-catalog.md) lists current declarations. The [package README](../../packages/core/session/README.md#write-experimental-plugin-records) owns the caller restriction, retention, and read path.
+
+```ts type-equiv
+/**
+ * Event type of an experimental plugin record: `plugin:` followed by
+ * slash-separated segments of lowercase letters, digits, `.`, `_`, and `-`,
+ * each starting with a letter or digit. A record type is never a
+ * {@link SessionEventMap} member.
+ */
+type PluginRecordType = `plugin:${string}`
+```
+
+```ts type-equiv
+/**
+ * Payloads written by experimental packages, keyed by their `plugin:` record
+ * names. Packages augment this map to type writes and enter the current plugin
+ * record catalog; these declarations do not enter {@link SessionEventMap} or
+ * released persistence schemas. Stored records still require owner validation.
+ */
+interface PluginRecordMap {}
+```
+
+```ts type-equiv
+/**
+ * One committed experimental plugin record, read from the log by
+ * `pluginRecordOf`. The record's owner validates `data` before use, because a
+ * restored record carries whatever JSON an earlier build of its owner wrote,
+ * or a V3 event that a format migration renamed into the `plugin:` namespace held.
+ */
+interface PluginRecord {
+  /** The record type, chosen by the owning plugin. */
+  readonly type: PluginRecordType
+  /** The record's position in the Session log. */
+  readonly seq: SessionSeq
+  /** Unix epoch milliseconds at append. */
+  readonly time: number
+  /** The JSON payload as committed. */
+  readonly data: unknown
+}
+```
+
 ## Durability contract
 
 What a persistence backend relies on: the durable log persists every event losslessly, and every Assistant attempt is one `assistant/message` or `assistant/attempt` whose embedded compact stream preserves the original timed chunks. `seq` stays contiguous across these settlements and all interleaved events. A backend may choose its own storage framing for an event batch as long as a handle's `read()` returns the exact appended events; current JSONL writes one row per event (see [persistence.md](persistence.md)). All `event.data` must be JSON-serializable; `Session.append` enforces this at the source (throwing on non-serializable data), so a bad event never enters the log and `session.snapshotEvents()` always equals what a backend can persist. Adding an event type that carries non-serializable data, corrupts core execution nesting, or violates its owner's declared relation is a breaking change to the on-disk format.
@@ -791,14 +842,6 @@ Host service backing the generated `ctx.remote.session` namespace.
 resolveAgent(sessionId: SessionId): Promise<ApiSessionAgentResult>
 
 /**
- * Inspect one attached or persisted Session without activating its Agent.
- * @param sessionId - durable Session identity.
- * @param signal - optional caller cancellation for persistence reads.
- * @returns the current attached state or persisted header and event prefix.
- */
-inspect( sessionId: SessionId, signal?: AbortSignal, ): Promise<SessionInspection>
-
-/**
  * Read all visible Session rows without resuming an Agent.
  * @param _request - reserved empty list request.
  * @param signal - cancellation for persistence reads and summary generation.
@@ -807,17 +850,19 @@ inspect( sessionId: SessionId, signal?: AbortSignal, ): Promise<SessionInspectio
 @Remote('list') async list(_request: SessionListRequest, signal: AbortSignal): Promise<SessionListValue>
 
 /**
- * Search visible Session content without resuming an Agent.
+ * Search visible Session content without resuming an Agent. A non-owner
+ * receives only the hits whose Session `allows()` admits; `hasMore`
+ * describes the bounded result before that filtering.
  * @param request - literal message-content query.
  * @param signal - cancellation for list and search reads.
  * @returns authorized bounded Session search results.
  */
-@Remote('search') search(request: SessionSearchRequest, signal: AbortSignal): Promise<SessionSearchValue>
+@Remote('search') async search(request: SessionSearchRequest, signal: AbortSignal): Promise<SessionSearchValue>
 
 /**
- * Create or idempotently adopt one ordinary Session.
- * @param request - requested identity, location, and Agent preset.
- * @returns the Session identity and resolved preset when configured.
+ * Create one ordinary Session for a new conversation, reusing the named blank Session while it is reusable.
+ * @param request - optional blank Session to reuse, location, and Agent preset.
+ * @returns the created or reused Session identity and its preset when configured.
  */
 @Remote('create') create(request: SessionCreateRequest): Promise<SessionCreateValue>
 
@@ -887,10 +932,10 @@ workspaceDesktop(): { name: string; available: boolean; fileManager: 'finder' | 
  * Fork one cold-readable exact event prefix into a new Session. An omitted
  * boundary selects the latest completed-turn prefix; an open cut receives
  * synthetic fork closers.
- * @param request - source Session and optional exact inclusive event boundary.
+ * @param request - source Session, optional exact inclusive event boundary, and migration preflight choice.
  * @returns the new Session identity.
  */
-@Remote('fork') fork(request: SessionForkRequest): Promise<SessionForkValue>
+@Remote('fork') async fork(request: SessionForkRequest): Promise<SessionForkValue>
 
 /**
  * Admit one prompt after explicitly resuming its Session.
@@ -898,7 +943,7 @@ workspaceDesktop(): { name: string; available: boolean; fileManager: 'finder' | 
  * @param signal - caller cancellation before prompt admission begins.
  * @returns acknowledgement that the Agent accepted the prompt.
  */
-@Remote('prompt') prompt(request: SessionPromptRequest, signal: AbortSignal): Promise<SessionPromptValue>
+@Remote('prompt') async prompt(request: SessionPromptRequest, signal: AbortSignal): Promise<SessionPromptValue>
 
 /**
  * Read one image proven reachable from the addressed Session log.
@@ -939,10 +984,10 @@ workspaceDesktop(): { name: string; available: boolean; fileManager: 'finder' | 
 @Remote({ mode: 'stream' }) follow(request: SessionFollowRequest, signal: AbortSignal): AsyncIterable<SessionFollowFrame>
 
 /**
- * Read all registered projections without activating an Agent.
+ * Read exact projections, returning cached hints only when migration is required.
  * @param request - Session whose current values are required.
- * @param signal - cancellation for the Session observation.
- * @returns complete baseline, or null when the Session does not exist.
+ * @param signal - cancellation for the Session read.
+ * @returns a sequenced baseline, cached hints when migration is deferred, or null when absent.
  */
 @Remote('projections') async projections(request: SessionProjectionsRequest, signal: AbortSignal): Promise<SessionProjectionsValue>
 
@@ -951,10 +996,10 @@ workspaceDesktop(): { name: string; available: boolean; fileManager: 'finder' | 
  * @param signal - cancellation owned by the Remote stream carrier.
  * @returns one complete baseline followed by live replacement frames.
  */
-@Remote({ mode: 'stream' }) control(signal: AbortSignal): AsyncIterable<SessionControlFrame>
+@Remote({ mode: 'stream' }) async *control(signal: AbortSignal): AsyncIterable<SessionControlFrame>
 ```
 
-Types: [SessionId](core.md) · [SessionInspection](persistence.md) · [SessionSearchRequest](session-query.md)
+Types: [SessionId](core.md) · [SessionSearchRequest](session-query.md)
 
 Source: [`packages/api/session-controller/src/index.ts`](../../packages/api/session-controller/src/index.ts)
 
@@ -1013,7 +1058,7 @@ create(id?: SessionId, options?: CreateSessionOptions): Session
  *   `eventState`, every seed event is either independently owned or any
  *   shared value is deeply frozen; {@link Session.fromRestore} validates and
  *   adopts those values without copying or freezing them.
- * @returns the constructed session, NOT yet in the store.
+ * @returns the store-owned session, not yet entered and read-only until announced.
  * @throws if a session with `id` already exists, metadata is not a plain
  *   lossless-JSON record with valid scalar fields, or `meta.cwd` is a
  *   non-absolute path.
@@ -1021,8 +1066,9 @@ create(id?: SessionId, options?: CreateSessionOptions): Session
 prepare(id?: SessionId, options?: PrepareSessionOptions): Session
 
 /**
- * Enter a {@link prepare}d session into the store: install the module-private
- * append publication hooks and add it to the store. Returns the DETACH
+ * Enter a session into the store: install the module-private
+ * append publication hooks and add it to the store. Writes remain disabled
+ * until {@link announce} completes successfully. Returns the DETACH
  * disposer (hooks + store removal). Does NOT emit `session/created` —
  * the caller yields this disposer inside its effect and THEN calls
  * {@link announce}, so a throwing `session/created` listener rolls the attach
@@ -1036,7 +1082,7 @@ prepare(id?: SessionId, options?: PrepareSessionOptions): Session
  * the two back-to-back so they never trip this, but the public API cannot
  * assume that.
  *
- * @param session - a {@link prepare}d session not yet in the store.
+ * @param session - an unentered session; independent instances become store-owned.
  * @returns the detach disposer (publication hooks + store removal). When called from
  *   a synchronous `session/created` listener, removal and disposal wait until
  *   that creation dispatch unwinds.
@@ -1047,7 +1093,9 @@ enter(session: Session): () => void
 /** Emit `session/created` exactly once for an {@link enter}ed session (with
  * the carrier {@link enter} captured). Separate from {@link enter} so the
  * caller can yield the detach disposer first (rollback safety — see
- * {@link enter}).
+ * {@link enter}). The Session remains read-only throughout synchronous
+ * dispatch; successful completion enables appends. A failed announcement
+ * leaves it read-only and cannot be retried.
  * @param session - the entered session to announce to listeners.
  * @throws if the session is not live or its announcement already began,
  *   including a reentrant call from a creation listener. */
@@ -1082,7 +1130,7 @@ get(id: SessionId): Session | undefined
 list(): Session[]
 
 /**
- * Create a live child session from an exact prefix of a live source.
+ * Create an independent live session from an exact prefix of a live source.
  * `boundary` is an inclusive source event seq; omitted means the source's
  * current last event. An open tail receives synthetic tool results and
  * step/turn closers with the forked cause. Closed steps and turns remain
@@ -1213,12 +1261,14 @@ Source: [`packages/api/session-controller/src/types.ts`](../../packages/api/sess
 
 #### `session/created` — emit
 
-Creation announcement during session publication. A synchronous throw vetoes and rolls back with a paired disposal; detach requested during dispatch is deferred. A returned-promise rejection is logged but cannot retroactively veto this synchronous boundary. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only sessions entered through that agent's context.
+Read-only creation announcement after store entry. New events reject until every synchronous listener has returned successfully. A synchronous throw vetoes creation and rolls back with a paired disposal; detach requested during dispatch is deferred. A returned-promise rejection is logged but cannot retroactively veto this synchronous boundary. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only sessions entered through that agent's context.
 
 ```ts cordis-catalog
 /**
- * Creation announcement during session publication. A synchronous throw vetoes and rolls
- * back with a paired disposal; detach requested during dispatch is deferred.
+ * Read-only creation announcement after store entry.
+ * New events reject until every synchronous listener has returned successfully.
+ * A synchronous throw vetoes creation and rolls back with a paired disposal;
+ * detach requested during dispatch is deferred.
  * A returned-promise rejection is logged but cannot retroactively veto this
  * synchronous boundary.
  * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners

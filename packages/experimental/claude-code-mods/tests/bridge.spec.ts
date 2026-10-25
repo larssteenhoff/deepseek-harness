@@ -1,10 +1,11 @@
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { pathToFileURL } from 'node:url'
 import { join, resolve } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context, type Fiber } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -12,6 +13,7 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
+import WorkingDirectory from '@deepseek-ai/dsh-working-directory'
 import { createAssistantMessage, createUserMessage, ToolCallId as ToolCallIdOf } from '@deepseek-ai/dsh-llm'
 import type { LlmResolvedModelInfo } from '@deepseek-ai/dsh-llm'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
@@ -22,7 +24,7 @@ import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
-import { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
+import { defineContentToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import ClaudeCodeMods, { defineMod, MODS_API_VERSION, type Config, type ModPlugin, type ModRegister } from '../src/index.ts'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
@@ -78,7 +80,7 @@ interface HarnessOptions {
   /** Config per mod plugin, by name: the `options` its `register` receives. */
   readonly modConfig?: Record<string, Record<string, string | number | boolean | string[]>>
   readonly services?: (ctx: Context, workspace: string) => Promise<void>
-  readonly tools?: { mode?: 'native' | 'ptc' | 'both' }
+  readonly tools?: { mode?: 'native' | 'ptc' }
 }
 
 interface Harness {
@@ -108,6 +110,8 @@ async function harness(
   await ctx.plugin(CommandRuntime)
   const workspace = scratch('dsh-cc-mods-ws-')
   await options.services?.(ctx, workspace)
+  if (ctx.get('fs') === undefined) await ctx.plugin(LocalFileSystem, { cwd: workspace })
+  await ctx.plugin(WorkingDirectory, { defaultDirectory: workspace })
   const mods = await ctx.plugin(ClaudeCodeMods, { ...options.config })
   await mods.await()
   for (const entry of modsToLoad) {
@@ -246,7 +250,7 @@ describe('ticket-mod: a mod-registered tool, prompt context, and a turn.complete
     const agent = await h.agent()
     await h.turn(agent, 'open a PR for this change')
     expect(JSON.stringify(adapter.requests[0]?.messages)).toContain('Current branch: feature/mods')
-    const prompts = events(agent).filter(e => e.type === 'user/message')
+    const prompts = events(agent).filter(e => e.type === 'user/message' && e.data.source.kind === 'user')
     expect(prompts.map(e => e.type === 'user/message' && e.data.source)).toEqual([{ kind: 'user' }])
     expect(prompts[0]?.type === 'user/message' && prompts[0].data.content).toEqual([
       { type: 'text', text: 'open a PR for this change' },
@@ -413,7 +417,7 @@ describe('tool.call: answers and rewrites', () => {
       'claude-code-mods: reroute-mod: tool.call hook skipped: rerouted the call from echo to Read; the logged call runs the tool it named',
     )
     // A call without an agent (a host-side execute) is answered by the same schema rule.
-    const direct = await h.ctx.tools.execute({ callId: ToolCallIdOf('direct'), name: 'greet', arguments: {}, signal: new AbortController().signal })
+    const direct = await executeToolFixture(h.ctx, { callId: ToolCallIdOf('direct'), name: 'greet', arguments: {}, signal: new AbortController().signal })
     expect(direct.isError).toBe(false)
     expect(direct.content).toEqual([{ type: 'text', text: 'rendered hello from answer-mod' }])
     const refusals = h.warn.mock.calls.map(call => String(call[0])).filter(line => line.includes('rewrote the arguments of echo'))
@@ -533,7 +537,11 @@ describe('the mods API over harness services', () => {
         id: 'a1', cwd: h.workspace, root: h.workspace, model: 'mock', turns: 1,
         version: MODS_API_VERSION,
         usage: { startedAt: agent.session.header.createdAt, context: { window: 0 }, rateLimits: [] },
-        messages: [{ role: 'user', text: 'hello', toolUses: [] }, { role: 'assistant', text: 'ok', toolUses: [] }],
+        messages: [
+          { role: 'user', text: 'hello', toolUses: [] },
+          { role: 'user', text: `Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent working directory: ${JSON.stringify(h.workspace)}.`, toolUses: [] },
+          { role: 'assistant', text: 'ok', toolUses: [] },
+        ],
       })
       expect(out.store).toEqual({ count: 7, keys: ['count'] })
       expect(out.env).toBe('yes')
@@ -779,7 +787,7 @@ describe('subagents, programmatic calls, and malformed tool arguments', () => {
       'watch-mod: tool.call echo agent=root n=1',
       'watch-mod: turn.complete agent=root inputs=[{}]',
     ])
-    const direct = await h.ctx.tools.execute({ callId: ToolCallIdOf('direct'), name: 'echo', arguments: { command: 'direct' }, signal: new AbortController().signal })
+    const direct = await executeToolFixture(h.ctx, { callId: ToolCallIdOf('direct'), name: 'echo', arguments: { command: 'direct' }, signal: new AbortController().signal })
     expect(direct.isError).toBe(false)
     // The nested `$.tool.call` reaches only mods loaded before watch-mod, so its own hook is not re-entered.
     expect(h.info).toHaveBeenCalledWith('watch-mod: direct saw echo and {"result":"ran nested"}')
@@ -944,7 +952,7 @@ describe('loading diagnostics and configuration', () => {
   })
 
   it('is a Service plugin the Loader keeps by its default export', () => {
-    expect(ClaudeCodeMods.inject).toEqual([])
+    expect(ClaudeCodeMods.inject).toEqual(['workingDirectory', 'agents'])
     const loader = Object.create(Loader.prototype) as Loader
     const unwrapped: unknown = loader.unwrapExports({ default: ClaudeCodeMods })
     expect(unwrapped).toBe(ClaudeCodeMods)
@@ -1070,6 +1078,13 @@ describe('the band above the prompt', () => {
         await ctx.plugin(LocalSubprocessRuntime)
       },
     })
+    // Windows does not provide the POSIX sleep executable; other subprocesses run normally.
+    const spawn = h.ctx.subprocess.spawn.bind(h.ctx.subprocess)
+    const withoutSleep = vi.spyOn(h.ctx.subprocess, 'spawn').mockImplementation((spec) => {
+      if (spec.argv[0] === 'sleep') throw new Error('spawn sleep ENOENT')
+      return spawn(spec)
+    })
+    onTestFinished(() => { withoutSleep.mockRestore() })
     h.ctx.tools.register(echoTool('bash', ran))
     const agent = await h.agent()
     const mods = h.ctx.claudeCodeMods
@@ -1097,6 +1112,7 @@ describe('the band above the prompt', () => {
     expect(cancelId).toBeDefined()
     await mods.pressBand(agent, drawn.generation, cancelId ?? '')
     await holding
+    expect(h.warn).not.toHaveBeenCalledWith(expect.stringMatching(/tool.call hook skipped/))
     expect(ran).toEqual([])
     expect(toolResult(agent)?.text).toMatch(/Blast Radius held this command: the user pressed Cancel/)
     await waitFor(() => !JSON.stringify(seen.at(-1)).includes('Cancel'))

@@ -1,7 +1,6 @@
 /**
- * The globally named `send_message` and `interrupt_agent` tools: thin
- * model-facing adapters over `ctx.subagents.sendMessage()` and
- * `ctx.subagents.interrupt()`. They perform no lifecycle routing of their own —
+ * Shared messaging, interruption, and child discovery tools.
+ * They perform no lifecycle routing of their own —
  * residency, cold resume, and interrupt authorization belong to the subagent
  * service — and they live apart from the provider-bound
  * `@deepseek-ai/dsh-tool-subagent` instances so multiple delegation tools share
@@ -16,15 +15,17 @@ import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-subagent'
 import { markAdjacentAgentSendMessageTool } from '@deepseek-ai/dsh-subagent/internal'
+import { registerListAgents } from './list-agents.ts'
 
 export const name = 'tool-subagent-control'
-export const inject = ['tools', 'subagents']
+export const inject = ['tools', 'subagents', 'agents']
 
 /**
- * Register the `send_message` and `interrupt_agent` tools.
- * @param ctx - context carrying the tool registry and subagent service.
+ * Register the shared subagent control and discovery tools.
+ * @param ctx - context carrying tools, subagents, and live Agents.
  */
 export function apply(ctx: Context): void {
+  registerListAgents(ctx)
   ctx.tools.register(markAdjacentAgentSendMessageTool(defineTool({
     name: 'send_message',
     description:
@@ -75,8 +76,8 @@ export function apply(ctx: Context): void {
     name: 'interrupt_agent',
     description:
       'Ask a subagent to stop its current work. This call returns without waiting for it to stop. '
-      + 'You can continue a direct child\'s conversation later with send_message. '
-      + 'Subagents it started will keep running.',
+      + 'You can continue a local direct child\'s conversation later with send_message. '
+      + 'External executions stop permanently and cannot receive follow-ups. Subagents it started will keep running.',
     parameters: {
       agent_id: {
         type: 'string',

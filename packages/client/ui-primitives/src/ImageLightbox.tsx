@@ -53,8 +53,10 @@ export function ImageLightbox({ src, alt, labels, onClose }: {
       aria-modal="true"
       aria-label={labels.dialog}
     >
-      <div className={css.mask} aria-hidden="true" onMouseDown={onClose} />
-      <img ref={imageRef} className={css.image} src={src} alt={alt} tabIndex={-1} onClick={onClose} />
+      <div className={css.stage}>
+        <div className={css.mask} aria-hidden="true" onMouseDown={onClose} />
+        <img ref={imageRef} className={css.image} src={src} alt={alt} tabIndex={-1} onClick={onClose} />
+      </div>
     </div>,
     document.body,
   )

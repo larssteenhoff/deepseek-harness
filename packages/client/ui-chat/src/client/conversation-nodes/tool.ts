@@ -4,7 +4,7 @@ import type {
   ToolCallBlock, ToolResultNode,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
-import type {} from '@deepseek-ai/dsh-tools/types'
+import type {} from '@deepseek-ai/dsh-tool-executor-ptc/client'
 import { PartialArguments } from '@deepseek-ai/dsh-util-values'
 import type { ChatNode, ToolChatData } from '../contract/chat-nodes.ts'
 import { CHAT_SYNTHETIC_SEQ_OFFSETS, chatNode, contextLocation } from './common.ts'
@@ -125,6 +125,7 @@ interface DispatchData {
   readonly isError?: boolean
   readonly error?: { name: string; code: string; reason?: string }
   readonly content?: ToolResultNode['content']
+  readonly meta?: ToolResultNode['meta']
 }
 
 function childCall(match: ConversationMatch, data: DispatchData): StartedToolCall {
@@ -154,6 +155,7 @@ function childResult(match: ConversationMatch, data: DispatchData, previous?: To
     call: { name: data.name, argsRaw: jsonArguments(data.arguments) },
     callTime: previous?.time ?? null,
     content: data.content ?? [],
+    meta: data.meta,
     isError: data.isError === true,
     ...data.error === undefined ? {} : { error: data.error },
     subCalls: [],

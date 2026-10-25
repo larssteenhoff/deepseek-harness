@@ -8,11 +8,12 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { agentPresetProjectionDefinition } from '@deepseek-ai/dsh-agent-preset-registry'
-import SessionController from '@deepseek-ai/dsh-api-session-controller'
+import RemoteAccessService from '@deepseek-ai/dsh-api-remote-access'
+import type SessionController from '@deepseek-ai/dsh-api-session-controller'
 import { currentSessionMessageProjections } from '@deepseek-ai/dsh-session-format-catalog/message-projections'
 import { Session, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SessionProjectionCache, { checkpointRecord, projectionCacheDomainSpec } from '@deepseek-ai/dsh-session-projection-cache'
 import type { CheckpointRecord } from '@deepseek-ai/dsh-session-projection-cache'
 import SqliteSessionQueryEngine from '@deepseek-ai/dsh-session-query-sqlite'
@@ -27,6 +28,7 @@ import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import { assertBuiltBenchmarkRuntime } from '../support/built-worker.ts'
 import { serializeRecord } from '../../packages/storage/storage-json/src/format.ts'
 import { ANCHOR_COUNT } from './corpus-shape.ts'
+import { createBenchmarkSessionController } from './session-controller.ts'
 import {
   anchorHeader,
   corpusSessionId,
@@ -60,12 +62,20 @@ export interface SeedReport {
   readonly seedMs: number
 }
 
+/** Process CPU milliseconds, user plus system, over the same intervals as the wall-clock endpoints. */
+export interface PhaseCpu {
+  readonly bootMs: number
+  readonly firstMs: number
+  readonly repeatMs: number
+}
+
 /** List report: Host boot, then a cold and a repeated Session list. */
 export interface ListReport {
   readonly mode: 'list'
   readonly bootMs: number
   readonly firstMs: number
   readonly repeatMs: number
+  readonly cpu: PhaseCpu
   readonly items: number
   readonly itemsWithProjections: number
   readonly memory: CorpusMemory
@@ -77,6 +87,7 @@ export interface SearchReport {
   readonly bootMs: number
   readonly firstMs: number
   readonly repeatMs: number
+  readonly cpu: PhaseCpu
   readonly firstItems: number
   readonly repeatItems: number
   readonly memory: CorpusMemory
@@ -90,6 +101,7 @@ export interface ForkReport {
     readonly rank: number
     readonly sourceEvents: number
     readonly forkMs: number
+    readonly forkCpuMs: number
   }[]
   readonly memory: CorpusMemory
 }
@@ -130,7 +142,7 @@ async function mountHost(root: string): Promise<{ readonly ctx: Context; readonl
   await ctx.plugin(SessionProjectionCache, { writeEveryEvents: 200, writeIntervalMs: 5_000 })
   // Content search is opt-in; enabled deployments defer the in-memory index to the first search.
   await ctx.plugin(SqliteSessionQueryEngine, { path: ':memory:', openAt: 'first-search' })
-  ctx.sessionProjections.register(agentPresetProjectionDefinition)
+  await ctx.sessionProjections.register(agentPresetProjectionDefinition)
   await ctx.plugin(SessionTitleService, { fallbackMaxWords: 5, fallbackMaxBytes: 40, maxTitleBytes: 80 })
   await ctx.plugin(SessionStatsPlugin)
   await ctx.plugin(SessionTurnOutlinePlugin)
@@ -138,11 +150,16 @@ async function mountHost(root: string): Promise<{ readonly ctx: Context; readonl
   await ctx.plugin(AgentLoop, { agents: [] })
   // Transport, upload, model-default, and Workspace services are outside every measured path.
   const dispose = (): void => {}
-  ctx.provide('typert', { lookups: { configure: () => dispose }, contexts: { configureHost: () => dispose } } as never)
+  ctx.provide('typert', {
+    lookups: { configure: () => dispose },
+    contexts: { configureHost: () => dispose },
+    resources: { register: () => dispose },
+  } as never)
   ctx.provide('fileUploads', { registerAgentResolver: () => dispose } as never)
   ctx.provide('agentDefaultModel', { currentSelection: () => BENCH_MODEL } as never)
   ctx.provide('workspaceRegistry', { list: () => [], archivedSessionIds: [] } as never)
-  const controller = new SessionController(ctx, { nativeOpen: false }, { canOpenPath: () => false })
+  new RemoteAccessService(ctx)
+  const controller = await createBenchmarkSessionController(ctx, { nativeOpen: false })
   return { ctx, controller }
 }
 
@@ -251,16 +268,25 @@ async function seed(root: string, name: string, count: number): Promise<SeedRepo
   return { mode: 'seed', name, corpus: written.facts, seedMs: performance.now() - started }
 }
 
+function cpuMs(): number {
+  const usage = process.cpuUsage()
+  return (usage.user + usage.system) / 1_000
+}
+
 async function measureList(root: string, expected: number): Promise<ListReport> {
   const started = performance.now()
+  const cpuStarted = cpuMs()
   const { ctx, controller } = await mountHost(root)
   try {
     const booted = performance.now()
+    const cpuBooted = cpuMs()
     const signal = new AbortController().signal
     const first = await controller.list({}, signal)
     const firstDone = performance.now()
+    const cpuFirstDone = cpuMs()
     const repeated = await controller.list({}, signal)
     const done = performance.now()
+    const cpuDone = cpuMs()
     if (first.items.length !== expected || repeated.items.length !== expected) {
       throw new Error(`Session list returned ${String(first.items.length)} of ${String(expected)} Sessions`)
     }
@@ -269,6 +295,7 @@ async function measureList(root: string, expected: number): Promise<ListReport> 
       bootMs: booted - started,
       firstMs: firstDone - booted,
       repeatMs: done - firstDone,
+      cpu: { bootMs: cpuBooted - cpuStarted, firstMs: cpuFirstDone - cpuBooted, repeatMs: cpuDone - cpuFirstDone },
       items: first.items.length,
       itemsWithProjections: first.items.filter(item => item.projections !== undefined).length,
       memory: await memory(),
@@ -280,14 +307,18 @@ async function measureList(root: string, expected: number): Promise<ListReport> 
 
 async function measureSearch(root: string): Promise<SearchReport> {
   const started = performance.now()
+  const cpuStarted = cpuMs()
   const { ctx, controller } = await mountHost(root)
   try {
     const booted = performance.now()
+    const cpuBooted = cpuMs()
     const signal = new AbortController().signal
     const first = await controller.search({ query: SEARCH_QUERIES[0] }, signal)
     const firstDone = performance.now()
+    const cpuFirstDone = cpuMs()
     const repeated = await controller.search({ query: SEARCH_QUERIES[1] }, signal)
     const done = performance.now()
+    const cpuDone = cpuMs()
     if (first.items.length === 0 || repeated.items.length === 0) {
       throw new Error('Session search matched no synthetic Session')
     }
@@ -296,6 +327,7 @@ async function measureSearch(root: string): Promise<SearchReport> {
       bootMs: booted - started,
       firstMs: firstDone - booted,
       repeatMs: done - firstDone,
+      cpu: { bootMs: cpuBooted - cpuStarted, firstMs: cpuFirstDone - cpuBooted, repeatMs: cpuDone - cpuFirstDone },
       firstItems: first.items.length,
       repeatItems: repeated.items.length,
       memory: await memory(),
@@ -313,11 +345,13 @@ async function measureFork(root: string, ranks: readonly number[]): Promise<Fork
     const forks: ForkReport['forks'][number][] = []
     for (const rank of ranks) {
       const forkStarted = performance.now()
+      const forkCpuStarted = cpuMs()
       const { sessionId } = await controller.fork({ sessionId: corpusSessionId(rank) })
       const forkMs = performance.now() - forkStarted
+      const forkCpuMs = cpuMs() - forkCpuStarted
       const child = ctx.sessions.get(sessionId)
       if (child === undefined) throw new Error(`fork of rank ${String(rank)} did not publish its child`)
-      forks.push({ rank, sourceEvents: child.inheritedEventCount, forkMs })
+      forks.push({ rank, sourceEvents: child.inheritedEventCount, forkMs, forkCpuMs })
     }
     return { mode: 'fork', bootMs: booted - started, forks, memory: await memory() }
   } finally {

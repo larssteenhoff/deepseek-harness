@@ -25,6 +25,8 @@ kind: "package-library"
 <a id="use-this-package"></a>
 ## 使用本包
 
+仅测试消费方且使用结构化 Agent 桩的测试可调用 `provideWorkingDirectoryFixture(ctx, defaultDirectory?)`。它只提供目录值，不校验路径、不切换目录，也不记录事件。目录行为测试使用 `mountAgentLoopTestDependencies(ctx, { workingDirectory: true })` 与真实临时目录。
+
 本包为 AgentLoop 测试提供可用的服务拓扑，并要求测试明确选择生产 Inbox 行为或结构化桩。
 
 ### 驱动生产 Agent
@@ -55,14 +57,15 @@ const admitted = harness.claim(agent, 'next-turn', 1)
 
 ### 构造结构化 Agent 桩
 
-当测试对象需要可变的待处理列表，但不测试持久性、投影校验、实时 Inbox 通知或驱动的认领策略时，使用 `createInboxStub()`。该桩通过两个进程内数组实现公开队列操作，且绝不会写入 Session。当测试对象不应访问待处理输入时，使用 `unsupportedInbox()`；每次变更都会在首个意外依赖处抛错。
+当测试对象需要可变的待处理列表，但不测试持久性、投影校验、实时 Inbox 通知或驱动的认领策略时，使用 `createInboxStub()`。该桩通过两个进程内数组实现公开队列操作，且绝不会写入 Session。当测试对象不应访问待处理输入时，使用 `unsupportedInbox()`；每次变更都会在首个意外依赖处抛错。当测试不读取或更改模型选择时，使用 `unsupportedModel()`；它的所有操作都会抛错。
 
 ```ts
-import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { createInboxStub, unsupportedModel } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const agent = {
   // ...
   inbox: createInboxStub(),
+  model: unsupportedModel(),
 }
 ```
 

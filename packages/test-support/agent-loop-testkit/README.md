@@ -1,5 +1,5 @@
 ---
-description: "Prerequisite mounting, production AgentLoop drivers, and explicit Inbox stubs for agent-loop tests."
+description: "Prerequisite mounting, production AgentLoop drivers, and explicit Agent stubs for agent-loop tests."
 kind: "package-library"
 ---
 
@@ -24,6 +24,8 @@ Use `dsh-agent-loop-testkit` to give AgentLoop tests the standard prerequisites 
 
 <a id="use-this-package"></a>
 ## Use this package
+
+Consumer-only tests with structural Agent stubs can use `provideWorkingDirectoryFixture(ctx, defaultDirectory?)`. It supplies directory values without validating paths, changing directories, or recording events. Tests of directory behavior use `mountAgentLoopTestDependencies(ctx, { workingDirectory: true })` and real temporary directories.
 
 This package gives an AgentLoop test a working service topology and keeps the choice between production Inbox behavior and a structural stub explicit.
 
@@ -55,14 +57,15 @@ The dependency helper forwards system-prompt and tool-registry configuration thr
 
 ### Build a structural Agent stub
 
-Use `createInboxStub()` when the test subject needs mutable pending lists but does not exercise durability, projection validation, live Inbox notifications, or the driver's claim policy. The stub implements the public queue operations with two process-local arrays and never writes to a Session. Use `unsupportedInbox()` when the test subject must not touch pending input; every mutation throws at the first unexpected dependency.
+Use `createInboxStub()` when the test subject needs mutable pending lists but does not exercise durability, projection validation, live Inbox notifications, or the driver's claim policy. The stub implements the public queue operations with two process-local arrays and never writes to a Session. Use `unsupportedInbox()` when the test subject must not touch pending input; every mutation throws at the first unexpected dependency. Use `unsupportedModel()` when the test does not read or change model selection; all its operations throw.
 
 ```ts
-import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { createInboxStub, unsupportedModel } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const agent = {
   // ...
   inbox: createInboxStub(),
+  model: unsupportedModel(),
 }
 ```
 

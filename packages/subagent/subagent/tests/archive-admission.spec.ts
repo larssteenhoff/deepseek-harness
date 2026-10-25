@@ -1,8 +1,9 @@
+import { mountWorkingDirectoryFixture } from './working-directory-fixture.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentCancelCause, AgentStatus, CancelOptions } from '@deepseek-ai/dsh-agent'
-import { unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { unsupportedModel, unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
@@ -21,6 +22,7 @@ async function harness(options: { sessionQuery?: boolean } = {}): Promise<Contex
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentRegistry)
   if (options.sessionQuery !== false) await ctx.plugin(TestSessionQuery)
+  await mountWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
   return ctx
 }
@@ -32,6 +34,7 @@ async function liveAgent(ctx: Context, session: Session, initial: AgentStatus): 
     id: session.id,
     options: {},
     session,
+    model: unsupportedModel(),
     inbox: unsupportedInbox(),
     get status() { return status },
     ctx,
@@ -162,6 +165,7 @@ describe('Subagent archive admission: lifetime', () => {
     await ctx.plugin(SessionStore)
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(AgentRegistry)
+    await mountWorkingDirectoryFixture(ctx)
     const fiber = await ctx.plugin(SubagentRuntime)
     const parent = ctx.sessions.create(SessionId('watched'))
     await liveAgent(ctx, parent, 'idle')

@@ -1,11 +1,14 @@
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import type { Message } from '@deepseek-ai/dsh-llm'
-import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness, provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
@@ -32,8 +35,10 @@ afterEach(async () => {
 
 const mod: LoadedMod = { name: 'unit-mod', version: undefined, root: '/mods/unit-mod', options: {}, order: 0 }
 
-function setup(ctx = new Context()) {
+async function setup(ctx = new Context()) {
   contexts.push(ctx)
+  if (ctx.get('sessionProjections') === undefined) await ctx.plugin(SessionProjectionRegistry)
+  if (ctx.get('agents') === undefined) await ctx.plugin(AgentRegistry)
   const registrations = new Map<string, Set<() => void>>()
   const ops = createHostOps({
     ctx,
@@ -70,12 +75,16 @@ function fakeAgent(ctx: Context, overrides: { cwd?: string; model?: string; requ
     id: 'fake',
     ctx,
     options: overrides.model === undefined ? {} : { model: overrides.model },
-    session: {
-      id: 'fake',
-      header: { id: 'fake', createdAt: 1, ...overrides.cwd === undefined ? {} : { cwd: overrides.cwd } },
+    session: Object.assign(Session.create(SessionId('fake'), [], {
+      version: SESSION_FORMAT_VERSION,
+      id: SessionId('fake'),
+      createdAt: 1,
+      isSeeded: false,
+      ...overrides.cwd === undefined ? {} : { cwd: overrides.cwd },
+    }), {
       requestHeader: () => overrides.requestModel === undefined ? undefined : { config: { provider: 'p', model: overrides.requestModel } },
       deriveMessages: (): Message[] => [],
-    },
+    }),
   }
   return facts as Agent
 }
@@ -98,7 +107,7 @@ describe('values', () => {
 
 describe('services a deployment did not compose', () => {
   it('names the missing service in each call', async () => {
-    const { call, ctx } = setup()
+    const { call, ctx } = await setup()
     const agent = fakeAgent(ctx)
     await expect(call('ui.ask', { question: 'q' }, agent)).rejects.toThrow(/dsh-user-questions/)
     await expect(call('command.register', { name: 'x', description: 'd' }, agent)).rejects.toThrow(/dsh-commands/)
@@ -111,7 +120,7 @@ describe('services a deployment did not compose', () => {
     await expect(call('store.get', { key: 'k' })).rejects.toThrow(/dsh-storage-domain/)
     await expect(call('fs.read', { path: 'x' })).rejects.toThrow(/dsh-fs/)
     await expect(call('process.run', { argv: ['ls'] })).rejects.toThrow(/dsh-subprocess/)
-    await expect(call('session.turns', {}, agent)).rejects.toThrow(/turnBoundary projection/)
+    await expect(call('session.turns', {}, agent)).resolves.toBe(0)
     // Without a drawn surface the ui calls that would redraw the band are plain no-ops.
     await expect(call('ui.invalidate', {}, agent)).resolves.toBeUndefined()
     await expect(call('ui.invalidate', {})).resolves.toBeUndefined()
@@ -121,7 +130,7 @@ describe('services a deployment did not compose', () => {
   })
 
   it('requires a session for session-bound calls and validates mod input', async () => {
-    const { call } = setup()
+    const { call } = await setup()
     for (const op of ['ui.ask', 'command.run', 'command.list', 'prompt.submit', 'session.id', 'session.cwd', 'session.root', 'session.model', 'session.turns', 'session.messages', 'session.usage']) {
       await expect(call(op, {})).rejects.toThrow(`$.${op} needs a session, and this event has none`)
     }
@@ -135,10 +144,11 @@ describe('services a deployment did not compose', () => {
 
 describe('session facts from the agent', () => {
   it('falls back from the logged route to the agent option to an empty model, and from the session cwd to the process cwd', async () => {
-    const { call, ctx } = setup()
+    const { call, ctx } = await setup()
     expect(await call('session.model', {}, fakeAgent(ctx, { requestModel: 'logged', model: 'opt' }))).toBe('logged')
     expect(await call('session.model', {}, fakeAgent(ctx, { model: 'opt' }))).toBe('opt')
     expect(await call('session.model', {}, fakeAgent(ctx))).toBe('')
+    provideWorkingDirectoryFixture(ctx)
     expect(await call('session.cwd', {}, fakeAgent(ctx))).toBe(process.cwd())
     expect(await call('session.cwd', {}, fakeAgent(ctx, { cwd: '/work' }))).toBe('/work')
     expect(await call('session.root', {}, fakeAgent(ctx))).toBe(process.cwd())
@@ -154,7 +164,8 @@ describe('files through the filesystem seam', () => {
     dirs.push(root)
     const ctx = new Context()
     await ctx.plugin(LocalFileSystem, { cwd: root })
-    const { call } = setup(ctx)
+    const { call } = await setup(ctx)
+    provideWorkingDirectoryFixture(ctx)
     writeFileSync(join(root, 'small.txt'), 'small')
     writeFileSync(join(root, 'big.txt'), Buffer.alloc(FS_MAX_BYTES + 1, 97))
     symlinkSync(join(root, 'small.txt'), join(root, 'link.txt'))
@@ -178,7 +189,7 @@ describe('processes through the subprocess seam', () => {
   it('runs argv with an explicit cwd and env, and reports a signal-terminated child', async () => {
     const ctx = new Context()
     await ctx.plugin(LocalSubprocessRuntime)
-    const { call } = setup(ctx)
+    const { call } = await setup(ctx)
     const cwd = mkdtempSync(join(tmpdir(), 'dsh-cc-mods-proc-'))
     dirs.push(cwd)
     const run = await call('process.run', {
@@ -187,6 +198,7 @@ describe('processes through the subprocess seam', () => {
     }) as { exitCode: number; stdout: string }
     expect(run.exitCode).toBe(0)
     expect(run.stdout.endsWith('|set')).toBe(true)
+    provideWorkingDirectoryFixture(ctx)
     const viaAgent = await call('process.run', { argv: ['node', '-e', 'process.stdout.write(process.cwd())'] }, fakeAgent(ctx, { cwd })) as { stdout: string }
     expect(viaAgent.stdout.length).toBeGreaterThan(0)
     const bare = await call('process.run', { argv: ['node', '-e', 'process.stdout.write(process.cwd())'] }) as { exitCode: number; stdout: string }
@@ -215,7 +227,7 @@ describe('the store limit', () => {
       close: () => Promise.resolve(),
     }
     ctx.provide('storageDomain', { open: () => Promise.resolve(domain) })
-    const { call } = setup(ctx)
+    const { call } = await setup(ctx)
     expect(await call('store.keys', {})).toEqual([])
     await call('store.set', { key: 'ok', value: 1 })
     expect(await call('store.keys', {})).toEqual(['ok'])
@@ -242,7 +254,7 @@ describe('registrations outside a session', () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
     await ctx.plugin(CommandRuntime)
-    const { call, registrations, engine } = setup(ctx)
+    const { call, registrations, engine } = await setup(ctx)
     await call('command.register', { name: 'Global', description: 'global command' })
     await call('tool.register', { name: 'global_tool', description: 'global tool' })
     expect(ctx.tools.schemas().map(tool => tool.name)).toContain('mcp__unit-mod__global_tool')
@@ -259,7 +271,7 @@ describe('registrations outside a session', () => {
 
 describe('ui.log sinks', () => {
   it('writes transcript lines at info and debug lines at debug', async () => {
-    const { call, ctx } = setup()
+    const { call, ctx } = await setup()
     const info = vi.fn()
     const debug = vi.fn()
     ctx.logger.info = info as never
@@ -268,5 +280,61 @@ describe('ui.log sinks', () => {
     await call('ui.log', { text: 'hidden', to: 'debug' })
     expect(info).toHaveBeenCalledWith('unit-mod: seen')
     expect(debug).toHaveBeenCalledWith('unit-mod: hidden')
+  })
+})
+
+
+describe('the committed directory owner', () => {
+  it('moves session cwd, relative files and new processes while retaining the project root', async () => {
+    const allocated = mkdtempSync(join(tmpdir(), 'dsh-mods-directory-'))
+    dirs.push(allocated)
+    // Native realpath expands Windows short-name temp paths before exact cwd comparisons.
+    const origin = await realpath(allocated)
+    const selected = join(origin, 'current')
+    mkdirSync(selected)
+    const current = await realpath(selected)
+    writeFileSync(join(origin, 'witness.txt'), 'origin')
+    writeFileSync(join(current, 'witness.txt'), 'current')
+    writeFileSync(join(current, 'only-current.txt'), 'selected')
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx, { workingDirectory: true })
+    const harness = await mountAgentLoopTestHarness(ctx)
+    await ctx.plugin(LocalSubprocessRuntime)
+    const { call } = await setup(ctx)
+    const agent = await harness.create(SessionId('directory-owner'), {}, { cwd: origin })
+    await ctx.workingDirectory.set(agent, current)
+
+    expect(await call('session.cwd', {}, agent)).toBe(current)
+    expect(await call('session.root', {}, agent)).toBe(origin)
+    expect(await call('fs.read', { path: 'witness.txt' }, agent)).toBe('current')
+    expect(await call('fs.exists', { path: 'only-current.txt' }, agent)).toBe(true)
+    expect(await call('fs.stat', { path: 'witness.txt' }, agent)).toMatchObject({ kind: 'file', size: 7 })
+    expect(await call('fs.list', { path: '.' }, agent)).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'only-current.txt' })]))
+    await call('fs.write', { path: 'created.txt', text: 'selected output' }, agent)
+    expect(await call('fs.exists', { path: join(origin, 'created.txt') }, agent)).toBe(false)
+    expect(await call('fs.read', { path: join(current, 'created.txt') }, agent)).toBe('selected output')
+    symlinkSync(join(current, 'witness.txt'), join(current, 'link.txt'))
+    const lstat = ctx.fs.lstat.bind(ctx.fs)
+    vi.spyOn(ctx.fs, 'lstat').mockImplementationOnce(async (path, options, signal) => {
+      const info = await lstat(path, options, signal)
+      await ctx.workingDirectory.set(agent, origin)
+      return info
+    })
+    expect(await call('fs.stat', { path: 'link.txt' }, agent)).toMatchObject({ kind: 'file', size: 7, isLink: true })
+    await ctx.workingDirectory.set(agent, current)
+    expect(await call('process.run', { argv: [process.execPath, '-e', 'process.stdout.write(process.cwd())'] }, agent)).toEqual({ exitCode: 0, stdout: current, stderr: '' })
+    expect(await call('process.run', { argv: [process.execPath, '-e', 'process.stdout.write(process.cwd())'], init: { cwd: origin } }, agent)).toEqual({ exitCode: 0, stdout: origin, stderr: '' })
+    expect(ctx.workingDirectory.get(agent.session)).toBe(current)
+    expect(agent.session.header.cwd).toBe(origin)
+  })
+
+  it('fails explicitly when a session-bound operation has no directory owner', async () => {
+    const { ctx, call } = await setup()
+    await ctx.plugin(LocalFileSystem)
+    await ctx.plugin(LocalSubprocessRuntime)
+    const agent = fakeAgent(ctx)
+    for (const [op, input] of [['session.cwd', {}], ['fs.read', { path: 'x' }], ['fs.stat', { path: 'x' }], ['process.run', { argv: [process.execPath] }]] as const) {
+      await expect(call(op, input, agent)).rejects.toThrow(/dsh-working-directory/)
+    }
   })
 })

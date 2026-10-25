@@ -11,7 +11,7 @@ import { globSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { act, cleanup } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
 import { bootInjections, orderByModuleGraph } from '@deepseek-ai/dsh-client-modules'
 import type { ClientModuleLoaderTarget, WebBootEntry, WebBootGraph } from '@deepseek-ai/dsh-client-modules/client'
@@ -179,6 +179,7 @@ interface FixtureWindow extends Window {
   __DSH_BOOT__?: WebBootGraph
   __ModuleLoader__?: ClientModuleLoaderTarget
   __DSH_TRANSPORT__?: { readonly rpc: RemoteMock['rpc'] }
+  __DSH_FILE_UPLOAD__?: { readonly fetch: AssembledRemote['fileUpload'] }
 }
 
 class ResizeObserverStub {
@@ -253,6 +254,7 @@ export function installAssembledBootEnv(): void {
     delete win.__DSH_BOOT__
     delete win.__ModuleLoader__
     delete win.__DSH_TRANSPORT__
+    delete win.__DSH_FILE_UPLOAD__
     document.body.innerHTML = ''
     document.head.querySelectorAll('style[data-plugin]').forEach((style) => { style.remove() })
     document.title = ''
@@ -281,6 +283,7 @@ export function mountAssembledApp(options: AssembledBootOptions = {}): Assembled
   const remote = createAssembledRemote(options.remote)
   mountedRemote = remote.mock
   win.__DSH_TRANSPORT__ = { rpc: remote.mock.rpc }
+  win.__DSH_FILE_UPLOAD__ = { fetch: remote.fileUpload }
   history.replaceState(null, '', '/')
   const root = document.createElement('div')
   root.id = 'root'
@@ -308,6 +311,29 @@ export function mountAssembledApp(options: AssembledBootOptions = {}): Assembled
     unmount = () => entry.dispose()
   })
   return remote
+}
+
+/**
+ * Create a fixture Session through the sidebar and wait for its own composer to mount.
+ * @param remote - fixture transport returned by mountAssembledApp.
+ * @returns composer inside the Session named by this creation's reply.
+ */
+export async function createAssembledSessionComposer(remote: AssembledRemote): Promise<HTMLElement> {
+  const tree = await screen.findByRole('tree', { name: 'Sessions' }, { timeout: 10_000 })
+  const start = tree.querySelector<HTMLButtonElement>('button[aria-label="New session in fixture"]')
+  if (start === null) throw new Error('fixture Workspace new-session action missing')
+  const previousCalls = remote.mock.log.calls('session/create').length
+  fireEvent.click(start)
+  return await waitFor(() => {
+    const creation = remote.mock.log.calls('session/create')[previousCalls]
+    if (creation?.state !== 'answered') throw new Error('fixture Session creation has not completed')
+    const { value: { sessionId } } = creation.result as { value: { sessionId: string } }
+    const conversation = [...document.querySelectorAll<HTMLElement>('[data-conversation-session]')]
+      .find(element => element.getAttribute('data-conversation-session') === sessionId)
+    const composer = conversation?.querySelector<HTMLElement>('[data-composer-input][contenteditable="true"]')
+    if (composer === undefined || composer === null) throw new Error(`composer for Session ${sessionId} has not mounted`)
+    return composer
+  }, { timeout: 10_000 })
 }
 
 /**

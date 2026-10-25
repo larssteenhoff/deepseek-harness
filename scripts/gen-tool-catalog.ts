@@ -7,7 +7,7 @@
  */
 
 import { globSync, readFileSync, writeFileSync } from 'node:fs'
-import { basename, resolve } from 'node:path'
+import { basename, dirname, resolve } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import LlmRuntime from '@deepseek-ai/dsh-llm'
 import type { ToolSchema } from '@deepseek-ai/dsh-llm'
@@ -19,12 +19,19 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SqliteSessionQueryEngine from '@deepseek-ai/dsh-session-query-sqlite'
 import GoalService from '@deepseek-ai/dsh-goal'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime, { type Config as ToolsConfig } from '@deepseek-ai/dsh-tools'
+import ToolRuntime from '@deepseek-ai/dsh-tools'
+import { NativeToolExecutor } from '@deepseek-ai/dsh-tool-executor-native'
+import { PtcExecutor } from '@deepseek-ai/dsh-tool-executor-ptc'
+import NodePtcRuntime from '@deepseek-ai/dsh-ptc-runtime-node'
+import LocalSandboxProvider from '@deepseek-ai/dsh-sandbox-local'
 import LocalBashExecutor from '@deepseek-ai/dsh-bash-local'
 import * as BashEnvPlugin from '@deepseek-ai/dsh-shell-env'
 import { PwshLocalExecutor } from '@deepseek-ai/dsh-pwsh-local'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
+import WorkingDirectory from '@deepseek-ai/dsh-working-directory'
+import * as ToolWorkingDirectory from '@deepseek-ai/dsh-tool-working-directory'
+import * as ToolWorktree from '@deepseek-ai/dsh-experimental-tool-worktree'
 import { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentLimits, ImageAttachmentRef, SaveImageAttachment, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
@@ -35,8 +42,9 @@ import * as WebFetchLocal from '@deepseek-ai/dsh-web-fetch-http'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import type { SubagentProvider } from '@deepseek-ai/dsh-subagent'
 import * as ToolSubagentControl from '@deepseek-ai/dsh-tool-subagent-control'
-import * as ToolSubagentListAgents from '@deepseek-ai/dsh-tool-subagent-control/list-agents'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
+import ActionCards from '@deepseek-ai/dsh-action-cards'
+import RemoteAccess from '@deepseek-ai/dsh-api-remote-access'
 import * as SkillFileSystem from '@deepseek-ai/dsh-skill-filesystem'
 import LocalJobRegistry from '@deepseek-ai/dsh-jobs-local'
 import * as ToolAskUser from '@deepseek-ai/dsh-tool-ask-user'
@@ -67,10 +75,12 @@ import * as ToolTeam from '@deepseek-ai/dsh-experimental-tool-agent-team'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
 import type PluginManager from '@deepseek-ai/dsh-plugin-manager'
 import * as PluginManagerTools from '@deepseek-ai/dsh-plugin-manager/tools'
+import type PluginMarket from '@deepseek-ai/dsh-plugin-market'
+import * as PluginMarketTools from '@deepseek-ai/dsh-plugin-market/tools'
 import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
 import McpResources from '@deepseek-ai/dsh-mcp-resources'
 import * as ToolSubagent from '@deepseek-ai/dsh-tool-subagent'
-import { registerListSubagentModels } from '../packages/subagent/tool-subagent/src/list-models.ts'
+import * as ToolSubagentOar from '@deepseek-ai/dsh-experimental-tool-subagent-oar'
 import * as ToolWeb from '@deepseek-ai/dsh-tool-web'
 import WorkflowEngine from '@deepseek-ai/dsh-workflow'
 import type { WorkflowRun, WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
@@ -122,7 +132,7 @@ class CatalogWorkflowEngine extends WorkflowEngine {
 function registerCatalogSubagentProvider(ctx: Context, name: string): void {
   const provider: SubagentProvider = {
     name,
-    capabilities: { agentOptions: true, outputSchema: true, depthLimit: true, toolFilter: true, persona: true },
+    capabilities: { agentOptions: true, agentPreset: true, outputSchema: true, depthLimit: true },
     inheritsParentContext: false,
     start: () => Promise.reject(new Error('tool-catalog provider cannot start a child')),
     // Declared so consumers configured for continuable background mode mount.
@@ -136,7 +146,7 @@ const catalogChildScopes = new WeakMap<Context, Agent>()
 
 /**
  * Tool package plus its hand-maintained boot recipe. The caller mounts the
- * prompt and registry; each recipe supplies only package-specific seams and
+ * prompt, directory services, and registry; each recipe supplies only package-specific seams and
  * config, while `dir` participates in the completeness check.
  */
 export interface ToolPackage {
@@ -161,13 +171,8 @@ export interface ToolPackage {
   mount: (ctx: Context) => Promise<void>
   /** Agent-like scope key whose tool view is catalogued instead of the global view. */
   scope?: (ctx: Context) => Agent
-  /**
-   * Config for the caller's `ToolRuntime` mount. The registry itself ships a
-   * model-facing tool (`run_code`, registered under a non-native `mode`), so
-   * ITS catalog entry boots the registry in the mode that exposes it;
-   * every other entry uses the default (native) registry.
-   */
-  toolsConfig?: ToolsConfig
+  /** Select the program transport when harvesting the PTC package. */
+  executor?: 'ptc'
   /**
    * A deployment note rendered after the package's tools, for a fact that
    * booting the package alone cannot show. The registered tool NAME can be a
@@ -198,6 +203,18 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
   },
   {
+    pkg: '@deepseek-ai/dsh-plugin-market',
+    dir: 'plugin-market',
+    source: 'packages/boot/plugin-market/src/tools.ts',
+    requires: ['ctx.tools', 'ctx.pluginMarket'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      // Schema harvest never fetches an index.
+      ctx.provide('pluginMarket', {} as PluginMarket)
+      await ctx.plugin(PluginMarketTools)
+    },
+  },
+  {
     pkg: '@deepseek-ai/dsh-mcp-resources',
     dir: 'mcp-resources',
     source: 'packages/mcp/mcp-resources/src/tools.ts',
@@ -225,6 +242,19 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
   },
   {
+    pkg: '@deepseek-ai/dsh-action-cards',
+    dir: 'action-cards',
+    source: 'packages/experimental/action-cards/src/index.ts',
+    requires: ['ctx.tools', 'ctx.agents', 'ctx.sessionProjections', 'ctx.remoteAccess'],
+    writes: ['tool/call', 'tool/result', 'plugin:action-cards/decision', 'user/message'],
+    async mount(ctx) {
+      await ctx.plugin(AgentRegistry)
+      await ctx.plugin(RemoteAccess)
+      await ctx.plugin(ActionCards)
+    },
+    note: 'Declared only to an Agent that loaded the skill of a registered card kind; the kind packages register their actions, and the Personalized recommendations bundle supplies the shipped kinds.',
+  },
+  {
     pkg: '@deepseek-ai/dsh-tool-ask-user',
     dir: 'tool-ask-user',
     source: 'packages/interaction/tool-ask-user/src/index.ts',
@@ -238,26 +268,29 @@ const TOOL_PACKAGES: ToolPackage[] = [
       'ask_user_question keeps the original blocking behavior by default; set `mode: timed` to opt into a foreground timeout and pending result while the question remains answerable. In timed mode, `timeout: -1` keeps that call blocking indefinitely.',
   },
   {
-    pkg: '@deepseek-ai/dsh-tools',
-    dir: 'tools',
-    source: 'packages/core/tools/src/ptc.ts',
-    requires: ['ctx.tools', 'ctx.ptcRuntime (execution time)', 'ctx.systemPrompt'],
+    pkg: '@deepseek-ai/dsh-tool-executor-ptc',
+    dir: 'tool-executor-ptc',
+    source: 'packages/core/tool-executor-ptc/src/ptc.ts',
+    requires: ['ctx.workingDirectory (Agent executions)', 'ctx.tools', 'ctx.ptcRuntime', 'ctx.systemPrompt'],
     writes: ['tool/call', 'one tool/ptc-dispatch-start + tool/ptc-dispatch pair per bridged sub-call', 'tool/result'],
-    // The registry's OWN tool: run_code exists only under a non-native mode
-    // (the registry registers it in its constructor; the PTC runtime is read
-    // at assembly/execution time, so the schema harvest needs none mounted).
-    toolsConfig: { mode: 'ptc' },
-    async mount() {},
+    executor: 'ptc',
+    async mount(ctx) {
+      await ctx.plugin(LocalSubprocessRuntime)
+      await ctx.plugin(LocalSandboxProvider)
+      await ctx.plugin(SandboxPolicy)
+      await ctx.plugin(NodePtcRuntime)
+    },
     note:
-      'Owned by the tool registry as a reserved transport outside filterable capability layers under `mode: ptc` / `mode: both` (see the PTC mode Agent Note). Under `ptc` it is the registry\'s only wire contribution; the other visible capabilities are declared in a generated SDK section in the loaded runtime\'s language, and a program calls them through bindings scheduled under the native concurrency contract (submission-ordered starts and policy; concurrency-safe bodies overlap up to `maxParallelSubCalls`) that re-enter the complete guarded tool pipeline and link each nested execution to this outer result.',
+      'The PTC executor exposes only run_code to the model and declares other visible capabilities in a generated SDK in the runtime’s language. Program bindings enter the shared guarded tool pipeline in submission order; concurrency-safe bodies overlap up to maxParallelSubCalls, and nested results remain linked to the outer program.',
   },
   {
     pkg: '@deepseek-ai/dsh-plan-mode',
     dir: 'plan-mode',
     source: 'packages/plan/plan-mode/src/index.ts',
-    requires: ['ctx.tools', 'ctx.systemPrompt', 'ctx.userQuestions (execution time, opportunistic)'],
+    requires: ['ctx.tools', 'ctx.systemPrompt', 'ctx.agents', 'ctx.userQuestions (execution time, opportunistic)'],
     writes: ['tool/call', 'plan/mode inactive on an approved review', 'tool/result'],
     async mount(ctx) {
+      await ctx.plugin(AgentRegistry)
       await ctx.plugin(PlanModeController, { section: 'Tool catalog schema harvest.' })
     },
     note:
@@ -267,7 +300,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
     pkg: '@deepseek-ai/dsh-tool-bash',
     dir: 'tool-bash',
     source: 'packages/shell/tool-bash/src/index.ts',
-    requires: ['ctx.tools', 'ctx.shell', 'ctx.systemPrompt', 'ctx.shellEnv', 'ctx.jobs for run_in_background and the job-backed foreground path'],
+    requires: ['ctx.workingDirectory', 'ctx.tools', 'ctx.shell', 'ctx.systemPrompt', 'ctx.shellEnv', 'ctx.jobs for run_in_background and the job-backed foreground path'],
     writes: ['tool/call', 'tool/result'],
     async mount(ctx) {
       await ctx.plugin(LocalSubprocessRuntime)
@@ -285,10 +318,10 @@ const TOOL_PACKAGES: ToolPackage[] = [
     pkg: '@deepseek-ai/dsh-tool-present',
     dir: 'tool-present',
     source: 'packages/deliverables/tool-present/src/index.ts',
-    requires: ['ctx.tools', 'ctx.fs', 'ctx.sessionProjections'],
+    requires: ['ctx.workingDirectory', 'ctx.tools', 'ctx.fs', 'ctx.agents'],
     writes: ['tool/call', 'deliverables/presented after a successful final result', 'tool/result'],
     async mount(ctx) {
-      await ctx.plugin(LocalFileSystem)
+      await ctx.plugin(AgentRegistry)
       await ctx.plugin(ToolPresent)
     },
     note: 'Deliveries belong to the calling Session; Web ui-deliverables supplies source-file opening and cards.',
@@ -297,7 +330,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
     pkg: '@deepseek-ai/dsh-tool-pwsh',
     dir: 'tool-pwsh',
     source: 'packages/shell/tool-pwsh/src/index.ts',
-    requires: ['ctx.tools', 'ctx.shell', 'ctx.systemPrompt', 'ctx.shellEnv', 'ctx.jobs for run_in_background and the job-backed foreground path'],
+    requires: ['ctx.workingDirectory', 'ctx.tools', 'ctx.shell', 'ctx.systemPrompt', 'ctx.shellEnv', 'ctx.jobs for run_in_background and the job-backed foreground path'],
     writes: ['tool/call', 'tool/result'],
     async mount(ctx) {
       // The pwsh tool consumes the bash executor seam; the schema harvest
@@ -330,7 +363,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
     pkg: '@deepseek-ai/dsh-tool-bash-persistent',
     dir: 'tool-bash-persistent',
     source: 'packages/shell/tool-bash-persistent/src/index.ts',
-    requires: ['ctx.tools', 'ctx.terminals', 'an owning Agent at execution time'],
+    requires: ['ctx.workingDirectory', 'ctx.tools', 'ctx.terminals', 'an owning Agent at execution time'],
     writes: ['tool/call', 'PTY shell state', 'tool/result'],
     async mount(ctx) {
       await ctx.plugin(TerminalSessionService)
@@ -343,7 +376,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
     pkg: '@deepseek-ai/dsh-tool-pwsh-persistent',
     dir: 'tool-pwsh-persistent',
     source: 'packages/shell/tool-pwsh-persistent/src/index.ts',
-    requires: ['ctx.tools', 'ctx.terminals', 'an owning Agent at execution time'],
+    requires: ['ctx.workingDirectory', 'ctx.tools', 'ctx.terminals', 'an owning Agent at execution time'],
     writes: ['tool/call', 'PTY shell state', 'tool/result'],
     async mount(ctx) {
       await ctx.plugin(TerminalSessionService)
@@ -359,7 +392,6 @@ const TOOL_PACKAGES: ToolPackage[] = [
     requires: ['ctx.tools', 'ctx.fs'],
     writes: ['tool/call', 'fs/observed after view presence/absence, edit absence, or successful mutation', 'tool/result'],
     async mount(ctx) {
-      await ctx.plugin(LocalFileSystem)
       await ctx.plugin(ToolStrReplaceEditor)
     },
     note:
@@ -369,13 +401,11 @@ const TOOL_PACKAGES: ToolPackage[] = [
     pkg: '@deepseek-ai/dsh-tool-fs',
     dir: 'tool-fs',
     source: 'packages/fs/tool-fs/src/index.ts',
-    requires: ['ctx.tools', 'ctx.fs', 'ctx.systemPrompt', 'ctx.attachments (image-tool registration)', 'ctx.llm + an image-capable route (image-tool execution)'],
+    requires: ['ctx.workingDirectory', 'ctx.tools', 'ctx.fs', 'ctx.systemPrompt', 'ctx.attachments (image-tool registration)', 'ctx.llm + an image-capable route (image-tool execution)'],
     writes: ['tool/call', 'fs/write-intent or fs/edit-intent for mutations', 'fs/observed after read presence/absence or successful file operation', 'durable attachment (read_image)', 'tool/result'],
     async mount(ctx) {
-      // The tool needs `fs`; the bare provider is sufficient because policy
-      // changes behavior, not schema shape. The catalog seam marker opts into
+      // The catalog seam marker opts into
       // the attachments-conditional image schema without attachment I/O.
-      await ctx.plugin(LocalFileSystem)
       await ctx.plugin(CatalogAttachmentStore)
       await ctx.plugin(ToolFs)
     },
@@ -386,7 +416,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
     pkg: '@deepseek-ai/dsh-tool-fs-search',
     dir: 'tool-fs-search',
     source: 'packages/fs/tool-fs-search/src/index.ts',
-    requires: ['ctx.tools', 'ctx.subprocess', 'ctx.systemPrompt'],
+    requires: ['ctx.workingDirectory', 'ctx.tools', 'ctx.subprocess', 'ctx.systemPrompt'],
     writes: ['tool/call', 'tool/result'],
     async mount(ctx) {
       // The tools inject `subprocess` (search spawns the packaged ripgrep
@@ -403,8 +433,8 @@ const TOOL_PACKAGES: ToolPackage[] = [
   {
     pkg: '@deepseek-ai/dsh-tool-terminal',
     dir: 'tool-terminal',
-    source: 'packages/terminal/tool-terminal/src/index.ts',
-    requires: ['ctx.tools', 'ctx.terminals', 'ctx.systemPrompt', 'ctx.jobs at call time for run_in_background'],
+    source: 'packages/experimental/tool-terminal/src/index.ts',
+    requires: ['ctx.workingDirectory', 'ctx.tools', 'ctx.terminals', 'ctx.systemPrompt', 'ctx.jobs at call time for run_in_background'],
     writes: ['tool/call', 'tool/result'],
     async mount(ctx) {
       await ctx.plugin(TerminalSessionService)
@@ -450,7 +480,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
     pkg: '@deepseek-ai/dsh-tool-lsp',
     dir: 'tool-lsp',
     source: 'packages/lsp/tool-lsp/src/index.ts',
-    requires: ['ctx.tools', 'ctx.lsp', 'ctx.systemPrompt'],
+    requires: ['ctx.workingDirectory', 'ctx.tools', 'ctx.lsp', 'ctx.systemPrompt'],
     writes: ['tool/call', 'tool/result'],
     async mount(ctx) {
       // The tool registers from the seam alone; the schema does not depend on any provider.
@@ -463,7 +493,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
   {
     pkg: '@deepseek-ai/dsh-tool-ralph',
     dir: 'tool-ralph',
-    source: 'packages/workflow/tool-ralph/src/index.ts',
+    source: 'packages/experimental/tool-ralph/src/index.ts',
     requires: ['ctx.tools', 'ctx.workflowEngine', 'ctx.subagents', 'ctx.systemPrompt', 'a calling Agent (exec.agent parents every fresh round)'],
     writes: ['tool/call', 'tool/result', 'workflow and child session events during execution'],
     async mount(ctx) {
@@ -479,7 +509,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
     pkg: '@deepseek-ai/dsh-tool-skill',
     dir: 'tool-skill',
     source: 'packages/skill/tool-skill/src/index.ts',
-    requires: ['ctx.tools', 'ctx.agents', 'ctx.skills'],
+    requires: ['ctx.workingDirectory', 'ctx.tools', 'ctx.agents', 'ctx.skills'],
     writes: ['tool/call', 'tool/result', 'user/message replacement catalogs via agent.inject()'],
     async mount(ctx) {
       await ctx.plugin(AgentRegistry)
@@ -494,16 +524,31 @@ const TOOL_PACKAGES: ToolPackage[] = [
   {
     pkg: '@deepseek-ai/dsh-tool-session-query',
     dir: 'tool-session-query',
-    source: 'packages/session-query/tool-session-query/src/index.ts',
-    requires: ['ctx.tools', 'ctx.systemPrompt', 'ctx.sessionQuery', 'a calling Agent for workspace authority'],
+    source: 'packages/experimental/tool-session-query/src/index.ts',
+    requires: ['ctx.tools', 'ctx.systemPrompt', 'ctx.sessionQuery', 'ctx.agents', 'a calling Agent for workspace authority'],
     writes: ['tool/call', 'tool/result'],
     async mount(ctx) {
       await ctx.plugin(SessionStore)
+      await ctx.plugin(AgentRegistry)
       await ctx.plugin(SqliteSessionQueryEngine, { path: ':memory:' })
       await ctx.plugin(ToolSessionQuery)
     },
     note:
       'The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-experimental-tool-subagent-oar',
+    dir: 'tool-subagent-oar',
+    source: 'packages/experimental/tool-subagent-oar/src/index.ts',
+    requires: ['ctx.tools', 'ctx.subagents'],
+    writes: ['tool/call', 'tool/result', 'parent subagent catalog and completion notices'],
+    async mount(ctx) {
+      await ctx.plugin(SubagentRuntime)
+      await ctx.plugin(ToolSubagentOar, {
+        providers: { codex: 'oar-codex', claude: 'oar-claude' },
+      })
+    },
+    note: 'The subagent_oar tool selects among configured aliases for external providers. This catalog shows Codex and Claude Code aliases; each deployment chooses its providers. Native model and permission settings belong to the selected provider configuration.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-subagent',
@@ -512,18 +557,17 @@ const TOOL_PACKAGES: ToolPackage[] = [
       list_subagent_models: 'packages/subagent/tool-subagent/src/list-models.ts',
       subagent: 'packages/subagent/tool-subagent/src/index.ts',
     },
-    requires: ['ctx.tools', 'ctx.subagents', 'ctx.systemPrompt', 'ctx.llm for model discovery and selected-route validation'],
+    requires: ['ctx.tools', 'ctx.subagents', 'ctx.systemPrompt', 'ctx.sessionProjections', 'ctx.llm for model discovery and selected-route validation'],
     writes: ['tool/call', 'tool/result', 'child session events through the chosen provider'],
     shippedNames: ['subagent', 'subagent_fork'],
     async mount(ctx) {
       await ctx.plugin(SubagentRuntime)
       await ctx.plugin(LlmRuntime)
       registerCatalogSubagentProvider(ctx, 'mock')
-      await ctx.plugin(ToolSubagent, { provider: 'mock' })
-      registerListSubagentModels(ctx, { routes: [{ provider: 'mock', model: 'mock' }] })
+      await ctx.plugin(ToolSubagent, { provider: 'mock', modelDiscovery: true })
     },
     note:
-      'The registered delegation name is the load-time `toolName` config (default `subagent`); the default schema above has model selection off, while the discovery schema is shown as the fixed companion available in an enabled Session. Web presets sample the Plugins preference for each new top-level Session and preserve that decision for its child Sessions; `subagent_fork` remains fixed-route. Each instance independently controls whether it reads model-selection settings and its background behavior through `modelSelectionSettings`, `backgroundMode`, and `enableRunInBackground`.',
+      'The load-time `toolName` selects the delegation name (default `subagent`); `modelSelection` adds optional route fields. `modelDiscovery` defaults off and registers shared discovery on one instance per scope. Web and Desktop presets enable spawn discovery and route fields and leave `subagent_fork` route fields disabled. The Host settings service records authorization for each new top-level Session; child Sessions inherit it. Without a recorded policy, discovery and explicit selection permit only the current parent route. Every delegation returns a child id promptly; local children accept follow-ups, while external backends report their single execution automatically.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-subagent-control',
@@ -533,7 +577,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
       list_agents: 'packages/subagent/tool-subagent-control/src/list-agents.ts',
       send_message: 'packages/subagent/tool-subagent-control/src/index.ts',
     },
-    requires: ['ctx.tools', 'ctx.subagents', 'ctx.agents and ctx.sessionProjections (list_agents only)'],
+    requires: ['ctx.tools', 'ctx.subagents', 'ctx.agents'],
     writes: ['tool/call', 'tool/result', 'child session events through ctx.subagents'],
     async mount(ctx) {
       await ctx.plugin(SubagentRuntime)
@@ -541,10 +585,9 @@ const TOOL_PACKAGES: ToolPackage[] = [
       await ctx.plugin(AgentRegistry)
       await ctx.plugin(SessionStore)
       await ctx.plugin(ToolSubagentControl)
-      await ctx.plugin(ToolSubagentListAgents)
     },
     note:
-      'The globally named control tools over continuable background subagents: provider-bound `tool-subagent` instances register distinct delegation tools, while this package registers `send_message` and `interrupt_agent` once, plus `list_agents` from its separately loaded `/list-agents` plugin (whose catalog rows use the sessionProjections and live Agent registries).',
+      'The globally named discovery, interruption, and local-message tools over managed subagents: provider-bound `tool-subagent` instances register distinct delegation tools, while one instance of this package registers `send_message`, `interrupt_agent`, and `list_agents`.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-jobs',
@@ -557,14 +600,14 @@ const TOOL_PACKAGES: ToolPackage[] = [
       await ctx.plugin(ToolJobs)
     },
     note:
-      'The kind-agnostic background-job controller: background bash commands, PTY sends, and subagents are read, listed, and killed through the same three tools. Loading the plugin attaches the controller that arms producers\' `ctx.jobs.start()`.',
+      'The kind-agnostic background-job controller: background bash commands and PTY sends are read, listed, and killed through the same three tools. Loading the plugin attaches the controller that arms producers\' `ctx.jobs.start()`.',
   },
   {
     pkg: '@deepseek-ai/dsh-experimental-tool-agent-team',
     dir: 'tool-agent-team',
     source: 'packages/experimental/tool-agent-team/src/index.ts',
     requires: ['ctx.tools', 'ctx.systemPrompt', 'ctx.agentTeams', 'an exact live Team member Agent'],
-    writes: ['tool/call', 'team/member', 'team/message/queued', 'team/message/delivered', 'team/task', 'tool/result'],
+    writes: ['tool/call', 'team/member', 'team/task', 'agent/inbox/spliced', 'user/message on inbox claim', 'tool/result'],
     async mount(ctx) {
       await ctx.plugin(AgentRegistry)
       await ctx.plugin(SessionStore)
@@ -608,6 +651,31 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-working-directory',
+    dir: 'tool-working-directory',
+    source: 'packages/session/tool-working-directory/src/index.ts',
+    requires: ['ctx.tools', 'ctx.workingDirectory'],
+    writes: ['tool/call', 'working-directory/change', 'user context for directory changes', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(ToolWorkingDirectory)
+    },
+    note: 'Reads or changes the calling Session directory. Existing shells and processes retain their own directories; origin metadata and permission roots stay fixed.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-experimental-tool-worktree',
+    dir: 'tool-worktree',
+    source: 'packages/experimental/tool-worktree/src/index.ts',
+    requires: ['ctx.tools', 'ctx.worktrees', 'a calling Agent'],
+    writes: ['tool/call', 'Git branch and checkout', 'working-directory/change', 'tool/result'],
+    async mount(ctx) {
+      ctx.provide('worktrees', {
+        create: () => Promise.reject(new Error('gen-tool-catalog: worktree creation is unavailable during schema harvest')),
+      })
+      await ctx.plugin(ToolWorktree)
+    },
+    note: 'Explicit experimental composition only. Creates a new branch and checkout from a pinned local commit under existing write permissions, then changes the Session directory. Leaving retains the branch and checkout.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-workflow',
@@ -669,7 +737,7 @@ export type ToolCatalog = CatalogPackage[]
 
 /**
  * Assert the boot manifest covers every shipped tool package on disk (a
- * `tool-*` leaf under `packages/`).
+ * `tool-*` leaf under `packages/`, excluding test support).
  * Booting has no source declaration to enumerate, so this glob restores the
  * "a new tool cannot be silently undocumented" guarantee: an unlisted package
  * fails the generator (and the freshness gate) until it is added to
@@ -678,7 +746,11 @@ export type ToolCatalog = CatalogPackage[]
  * `scanRoot` defaults to the repo root; a test may point it at a fixture tree.
  */
 export function assertManifestComplete(packages: ToolPackage[] = TOOL_PACKAGES, scanRoot: string = root): void {
-  const onDisk = globSync('packages/*/tool-*', { cwd: scanRoot }).map(p => basename(p)).sort()
+  // Native execution owns no tool definitions; PTC contributes run_code.
+  const onDisk = globSync('packages/*/tool-*', { cwd: scanRoot })
+    .filter(path => basename(dirname(path)) !== 'test-support')
+    .map(p => basename(p))
+    .filter(dir => dir !== 'tool-executor-native').sort()
   const listed = new Set(packages.map(p => p.dir))
   const missing = onDisk.filter(dir => !listed.has(dir))
   if (missing.length > 0) {
@@ -729,9 +801,16 @@ export async function collectToolCatalog(packages: ToolPackage[] = TOOL_PACKAGES
     try {
       await ctx.plugin(SessionProjectionRegistry)
       await ctx.plugin(SystemPrompt)
-      await ctx.plugin(ToolRuntime, entry.toolsConfig ?? {})
+      await ctx.plugin(LocalFileSystem)
+      await ctx.plugin(WorkingDirectory)
+      await ctx.plugin(ToolRuntime)
+      const executor = entry.executor === 'ptc' ? new PtcExecutor(ctx) : new NativeToolExecutor(ctx)
+      ctx.tools.setExecutor(executor)
       await entry.mount(ctx)
-      const schemas = ctx.tools.schemas(entry.scope?.(ctx)).sort((a, b) => a.name.localeCompare(b.name))
+      const scope = entry.scope?.(ctx)
+      const described = executor.describe(ctx.tools.definitions(scope))
+      const schemas = [...new Map([...ctx.tools.schemas(scope), ...described.schemas].map(schema => [schema.name, schema])).values()]
+        .sort((a, b) => a.name.localeCompare(b.name))
       assertToolsHarvested(entry, schemas.length)
       catalog.push({
         pkg: entry.pkg,

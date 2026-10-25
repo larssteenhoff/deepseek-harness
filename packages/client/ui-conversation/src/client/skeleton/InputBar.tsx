@@ -17,7 +17,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react'
 import clsx from 'clsx'
 import {
-  IconCloseOutlineRegular, IconPlusOutlineMedium, IconWarningOutlineRegular, Toast, Tooltip,
+  IconCloseOutlineRegular, IconPlusOutlineMedium, IconWarningOutlineRegular, isMobileDevice, Toast, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: the `plan` projection key merge (the TodoDock posture — the
 // composer reads a host-computed value; the domain owns the key).
@@ -31,11 +31,12 @@ import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ComposerBarProps } from '../contract/slots.ts'
 import { DraftEditor } from '../input/editor/DraftEditor.tsx'
 import {
-  focusDraftEditor, installDraftFilePicker, installDraftKeymap, installDraftWheel,
+  focusDraftEditor, installDraftFilePicker, installDraftKeyboardDismissal, installDraftKeymap, installDraftWheel,
   keepDraftFocus, revealDraftSelection,
 } from '../input/editor/view-binding.ts'
 import { resolveSubmitMode } from '../input/submission-policy.ts'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
+import { isImageMediaType } from '../service.ts'
 import { ContextMeter } from './ContextMeter.tsx'
 import { observeControlRow } from './control-row-layout.ts'
 import css from './InputBar.module.css'
@@ -47,6 +48,7 @@ export const InputBar = memo(function InputBar({
   retryFileUpload,
   toggleCommandMenu, stop, t,
   renderSlot, useBusyEnter, useFileUploads, useNotices, useLexicon, useMenuLauncher, useStopShortcut,
+  useAccess,
   useProjection, sessionId, variant, disabled: inert = false, blocked,
   workspacePickerOpen = false, onRequestWorkspace,
   placeholder, accessory,
@@ -55,6 +57,13 @@ export const InputBar = memo(function InputBar({
   const notice = useNotices(s => s)
   const busyEnter = useBusyEnter(s => s)
   const stopKeys = useStopShortcut(keys => keys)
+  // A page whose access snapshot excludes prompting, stopping, or uploading to this Session is offered
+  // no Send, no Stop, or no file intake rather than a disabled control. `useAccess` is undefined only
+  // without a Session, where the bar is an inert placeholder with no keyboard, stop, or file intake.
+  const promptDenied = useAccess('session/prompt') === false
+  const cancelDenied = useAccess('session/cancel') === false
+  const uploadDenied = useAccess('fileUploads/upload') === false
+  const stopAction = cancelDenied ? undefined : stop
   void useLexicon // hook seat stays bound by the inject compartment; text-ref decoration rides the shell's editor transforms
   const commandMenuOpen = useMenuLauncher(source => source === 'command')
   const [activity, setActivity] = useState(false)
@@ -79,11 +88,12 @@ export const InputBar = memo(function InputBar({
   )
   const empty = draft.trim() === '' && attachments.length === 0
   const uploads = useFileUploads(snapshot => snapshot)
-  // Send waits for every picked file: uploading and failed drafts both hold
-  // the gate (a failed upload is retried or removed, never silently dropped).
-  const uploadsPending = attachments.some(
-    attachment => attachment.kind === 'file' && uploads[attachment.id]?.status !== 'ready',
-  )
+  // Send waits for every picked file and every uploading image: uploading and
+  // failed drafts both hold the gate (a failed upload is retried or removed,
+  // never silently dropped). An image draft without an upload sends inline.
+  const uploadsPending = attachments.some(attachment => attachment.kind === 'file'
+    ? uploads[attachment.id]?.status !== 'ready'
+    : uploads[attachment.id] !== undefined && uploads[attachment.id]?.status !== 'ready')
   // Transient error banner (machine notices, image-intake rejections, and
   // prompt failures): the seq keys the Toast so an identical repeated message
   // restarts the hold-then-fade cycle instead of reusing the faded one.
@@ -97,6 +107,11 @@ export const InputBar = memo(function InputBar({
   // The deployment's image-intake limits (absent while no attachment service
   // is composed — the pre-check below then defers entirely to the host).
   const imageLimits = useProjection('imageLimits')
+  // Enter while uploads hold the send explains the first failed draft; a Host refusal names its reason.
+  const failedUpload = attachments.map(attachment => uploads[attachment.id]).find(upload => upload?.status === 'error')
+  const uploadsHeldText = failedUpload?.status !== 'error'
+    ? t('file.stillUploading')
+    : failedUpload.reason === undefined ? t('file.uploadFailed') : attachmentErrorText(t, failedUpload.reason, imageLimits)
   // Prompt failures are ordinary failures (no create/attach transaction exists
   // anymore): the toast announces promptError, the draft stays in the machine,
   // and the user resubmits. A remount over a session whose machine still holds
@@ -171,13 +186,11 @@ export const InputBar = memo(function InputBar({
     revealDraftSelection(scrollRef)
   }
 
-  // Unlock (mount / session switch) returns focus to the box, and owns the
-  // reveal that comes with it. Lexical's focus() suppresses the browser's
-  // scroll walk (preventScroll inside), so the reveal in our own scrollport
-  // is ours to perform — switching to a longer draft otherwise leaves the
-  // caret (restored at the draft's end) off screen.
+  // Automatic desktop focus restores and reveals the draft selection without
+  // scrolling the conversation.
   useEffect(() => {
     if (locked || editor === null) return
+    if (isMobileDevice()) return
     focusDraftEditor(editor, revealSelection)
   }, [locked, sessionId, editor])
 
@@ -209,8 +222,14 @@ export const InputBar = memo(function InputBar({
   // The host enforces the same image limits at submit for callers that bypass
   // this composer.
   const intakeFiles = useCallback((files: readonly File[], directories?: ReadonlySet<File>): void => {
-    if (subagent !== null || addFiles === undefined || files.length === 0) return
+    if (uploadDenied || locked || machineBusy || (subagent !== null && !continuable)
+      || addFiles === undefined || files.length === 0) return
     const rejected = ((): string | null => {
+      // Child prompts support images, but not generic file receipts or the
+      // Desktop path-reference fallback. Refuse mixed batches before intake.
+      if (continuable && files.some(file => directories?.has(file) || !isImageMediaType(file.type))) {
+        return t('image.unsupportedType')
+      }
       if (imageLimits !== undefined) {
         const mediaTypes = imageLimits.mediaTypes as readonly string[]
         const images = files.filter(file => mediaTypes.includes(file.type))
@@ -230,9 +249,9 @@ export const InputBar = memo(function InputBar({
       return addFiles(files, directories)
     })()
     if (rejected !== null) showToast(rejected)
-  }, [subagent, addFiles, attachments, imageLimits, showToast, t])
+  }, [uploadDenied, locked, machineBusy, subagent, continuable, addFiles, attachments, imageLimits, showToast, t])
 
-  const canAcceptDrop = subagent === null && !locked && !machineBusy && addFiles !== undefined
+  const canAcceptDrop = !uploadDenied && (subagent === null || continuable) && !locked && !machineBusy && addFiles !== undefined
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const onPickFiles = (e: ChangeEvent<HTMLInputElement>): void => {
@@ -246,11 +265,11 @@ export const InputBar = memo(function InputBar({
   // registration survives re-renders without re-arming per keystroke.
   const gate = useRef({
     locked, machineBusy, canSteerQueue, running, steeringAvailable, busyEnter,
-    intakeFiles, uploadsPending, showToast, t, canAcceptDrop,
+    intakeFiles, uploadsPending, uploadsHeldText, showToast, canAcceptDrop,
   })
   gate.current = {
     locked, machineBusy, canSteerQueue, running, steeringAvailable, busyEnter,
-    intakeFiles, uploadsPending, showToast, t, canAcceptDrop,
+    intakeFiles, uploadsPending, uploadsHeldText, showToast, canAcceptDrop,
   }
 
   useEffect(() => {
@@ -263,12 +282,31 @@ export const InputBar = memo(function InputBar({
     return installDraftKeymap(editor, keyboard, gate)
   }, [editor, keyboard])
 
+  useEffect(() => {
+    if (editor === null) return
+    return installDraftKeyboardDismissal(editor, cardRef)
+  }, [editor])
+
   // Button presses steal focus from the editor; suppress at mousedown so
   // typing continues seamlessly. Lexical's focus() carries preventScroll and
   // restores the previous selection, so no reveal is needed: the caret has
   // not moved, and the next keystroke gets the browser's native one.
   const keepFocus = (e: MouseEvent<HTMLButtonElement>): void => {
     keepDraftFocus(e, editor)
+  }
+
+  const onCardMouseDown = (e: MouseEvent<HTMLDivElement>): void => {
+    if (!editable || editor === null || e.button !== 0 || e.defaultPrevented) return
+    const target = e.target
+    if (!(target instanceof Element) || !e.currentTarget.contains(target)) return
+    if (target.closest('[data-composer-overlay]') !== null) return
+    if (scrollRef.current?.contains(target)) return
+    const control = target.closest('button, a, input, select, textarea, [role="button"], [contenteditable], [tabindex]')
+    if (control !== null && control !== e.currentTarget && e.currentTarget.contains(control)) return
+    e.preventDefault()
+    // Lexical's stored selection can lag behind native caret moves, so calling
+    // editor.focus() on a focused editor can restore an older caret.
+    if (document.activeElement !== editor.getRootElement()) focusDraftEditor(editor, revealSelection)
   }
 
   const onToggleCommandMenu = (): void => {
@@ -302,7 +340,7 @@ export const InputBar = memo(function InputBar({
   // exposes Stop independently.
   const primaryStops = running && subagent === null && (empty || blocked !== undefined)
   // Disabled native buttons may omit mouseleave; their tooltip must close from state.
-  const primaryDisabled = primaryStops ? stop === undefined : empty || disabled || machineBusy || uploadsPending
+  const primaryDisabled = primaryStops ? stopAction === undefined : empty || disabled || machineBusy || uploadsPending
   const interruptible = running && continuable
   const primarySubmitMode = resolveSubmitMode(busyEnter, running, 'enter', steeringAvailable)
   const plainMessageDraft = !empty && input?.phase === 'plain' && !draft.trimStart().startsWith('/')
@@ -313,7 +351,7 @@ export const InputBar = memo(function InputBar({
       : t('input.send')
   const onPrimary = (): void => {
     if (primaryStops) {
-      stop?.()
+      stopAction?.()
       return
     }
     if (keyboard === undefined) return // absent machine: the button is disabled
@@ -381,10 +419,12 @@ export const InputBar = memo(function InputBar({
           click's reopen (close-then-open flickers the chip's open echo). */}
       <div
         ref={cardRef}
+        tabIndex={-1}
         className={clsx(css.card, workspaceTrigger && css.cardWorkspaceTrigger)}
         data-composer-card
         onClick={workspaceTrigger ? onRequestWorkspace : undefined}
         onPointerDown={workspaceTrigger ? (e) => { e.stopPropagation() } : undefined}
+        onMouseDown={onCardMouseDown}
       >
         <div className={css.inputLine}>
           <div className={css.inputTools}>
@@ -405,7 +445,7 @@ export const InputBar = memo(function InputBar({
           </div>
           <div className={clsx(css.inputPill, interruptible && css.inputPillWithStop)}>
             {sessionId !== undefined && (
-              <div className={css.overlayAnchor}>{renderSlot('conversation.input.overlay', {})}</div>
+              <div className={css.overlayAnchor} data-composer-overlay>{renderSlot('conversation.input.overlay', {})}</div>
             )}
             {accessory !== undefined && <div className={css.accessory}>{accessory}</div>}
             {renderSlot('conversation.input.attachments', {
@@ -414,6 +454,7 @@ export const InputBar = memo(function InputBar({
               onAddFiles: intakeFiles,
               onRemoveAttachment: (id) => { removeAttachment?.(id) },
               uploads,
+              uploadFailureText: reason => attachmentErrorText(t, reason, imageLimits),
               onRetryFile: (id) => { retryFileUpload?.(id) },
               dropLimits: imageLimits === undefined ? undefined : {
                 count: imageLimits.maxImagesPerMessage,
@@ -452,7 +493,7 @@ export const InputBar = memo(function InputBar({
                 <IconCloseOutlineRegular size={14} />
               </button>
             </Tooltip>
-            <Tooltip
+            {(primaryStops ? cancelDenied : promptDenied) ? null : <Tooltip
               label={primaryStops ? t('input.stop') : primaryLabel}
               shortcutKeys={primaryStops ? stopKeys : undefined}
               side="top"
@@ -478,16 +519,16 @@ export const InputBar = memo(function InputBar({
                   </svg>
                 )}
               </button>
-            </Tooltip>
-            {interruptible && (
-              <Tooltip label={t('input.stop')} shortcutKeys={stopKeys} side="top" delayMs={500} disabled={stop === undefined}>
+            </Tooltip>}
+            {interruptible && !cancelDenied && (
+              <Tooltip label={t('input.stop')} shortcutKeys={stopKeys} side="top" delayMs={500} disabled={stopAction === undefined}>
                 <button
                   type="button"
                   className={clsx(css.primary, css.stopPrimary)}
                   aria-label={t('input.stop')}
-                  disabled={stop === undefined}
+                  disabled={stopAction === undefined}
                   onMouseDown={keepFocus}
-                  onClick={stop}
+                  onClick={stopAction}
                 >
                   <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden>
                     <rect x="3" y="3" width="10" height="10" rx="3" fill="currentColor" />
@@ -503,7 +544,7 @@ export const InputBar = memo(function InputBar({
               ref={fileInputRef}
               type="file"
               multiple
-              disabled={subagent !== null}
+              disabled={!canAcceptDrop || subagent !== null}
               hidden
               onChange={onPickFiles}
             />

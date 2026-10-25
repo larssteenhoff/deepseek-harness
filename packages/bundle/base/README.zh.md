@@ -47,9 +47,11 @@ kind: "package-bundle"
 
 ### 你得到什么
 
-开箱即用，基于本核心构建的每个 profile 都提供：DeepSeek 模型连接（提供方与模型可配置，你还可以在设置中启用额外提供方）、完整工具集——文件编辑、shell 命令、web 搜索、公开 HTTP(S) 抓取、subagent、任务与目标跟踪——可跨重启存活的持久会话，以及默认权限策略：把文件写入限制在工作区内，危险操作前征询许可。Web 抓取无需逐次审批，其提供方会拒绝非公开目的地址。反馈保存在会话日志中。随附 base profile 会禁用 OTel 会话导出、DeepSeek Session Log 上传和插件包元数据。除普通模型请求所需的提示词与上下文外，不会向 DeepSeek 发送遥测信息。
+开箱即用，基于本核心构建的每个 profile 都提供：DeepSeek 模型连接（提供方与模型可配置，你还可以在设置中启用额外提供方）、完整工具集——文件编辑、shell 命令、web 搜索、HTTP(S) 抓取、subagent、任务与目标跟踪——可跨重启存活的持久会话，以及默认权限策略：把文件写入限制在工作区内，危险操作前征询许可。Web 抓取无需逐次审批，其提供方可以访问 loopback 与内网主机。反馈保存在会话日志中。随附 base profile 会禁用 OTel 会话导出、DeepSeek Session Log 上传和插件包元数据。除普通模型请求所需的提示词与上下文外，不会向 DeepSeek 发送遥测信息。
 
-默认文件编辑使用 `read`、`write` 和 `edit`。`str_replace_editor` 工具仍可显式启用。要将它加入基于 base 的 profile，请在 profile、home 或逐次调用 patch 中添加以下条目：
+`subagent` 与 `subagent_fork` 都创建受管理的子任务，并立即返回 child id。使用 `send_message` 可引导活跃子任务，或在完成后继续其对话。[委派工具行为](../../subagent/tool-subagent/README.zh.md)说明了结果交付和后端能力。
+
+内置 `working_directory` 工具改变后续操作使用的目录，已有进程与写权限保持独立。当前目录信息出现在用户上下文中。默认文件编辑使用 `read`、`write` 和 `edit`。`str_replace_editor` 工具仍可显式启用。要将它加入基于 base 的 profile，请在 profile、home 或逐次调用 patch 中添加以下条目：
 
 ```yaml
 - insert:

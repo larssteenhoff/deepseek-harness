@@ -33,7 +33,15 @@ describe('dsh-sdk-minimal bundle', () => {
       ['plugin-package-inventory-deepseek', '@deepseek-ai/dsh-plugin-package-inventory-deepseek'],
       ['llm-deepseek', '@deepseek-ai/dsh-llm-deepseek-api-key'],
       ['sandbox', '@deepseek-ai/dsh-sandbox-local'],
+      ['filesystem', '@deepseek-ai/dsh-fs-local'],
+      ['attachment-local', '@deepseek-ai/dsh-attachment-local'],
+      ['tool-fs', '@deepseek-ai/dsh-tool-fs'],
+      ['working-directory', '@deepseek-ai/dsh-working-directory'],
+      ['tool-working-directory', '@deepseek-ai/dsh-tool-working-directory'],
       ['session-projection', '@deepseek-ai/dsh-session-projection'],
+      ['token-meter', '@deepseek-ai/dsh-token-meter'],
+      ['compaction-basic', '@deepseek-ai/dsh-compaction-basic'],
+      ['image-offload', '@deepseek-ai/dsh-compaction-image-offload'],
       ['sandbox-policy', '@deepseek-ai/dsh-sandbox-policy'],
       ['subprocess', '@deepseek-ai/dsh-subprocess-local'],
       ['pty', '@deepseek-ai/dsh-terminal'],
@@ -45,6 +53,7 @@ describe('dsh-sdk-minimal bundle', () => {
       ['session-title', '@deepseek-ai/dsh-session-title'],
       ['system-prompt', '@deepseek-ai/dsh-system-prompt'],
       ['tools', '@deepseek-ai/dsh-tools'],
+      ['tool-executor-native', '@deepseek-ai/dsh-tool-executor-native'],
       ['mcp-resources', '@deepseek-ai/dsh-mcp-resources'],
       ['agent', '@deepseek-ai/dsh-agent'],
       ['llm-retry', '@deepseek-ai/dsh-llm-retry'],
@@ -53,6 +62,7 @@ describe('dsh-sdk-minimal bundle', () => {
       ['persistent-bash', '@deepseek-ai/dsh-tool-bash-persistent'],
       ['persistent-pwsh', '@deepseek-ai/dsh-tool-pwsh-persistent'],
       ['sessions', '@deepseek-ai/dsh-session-persistence-jsonl'],
+      ['session-checkpoint-policy', '@deepseek-ai/dsh-session-checkpoint-policy'],
     ])
     for (const id of ['session-log-deepseek', 'plugin-package-inventory-deepseek']) {
       expect(rows.find(row => row.id === id)).toMatchObject({ disabled: true, config: { enabled: false } })
@@ -73,6 +83,8 @@ describe('dsh-sdk-minimal bundle', () => {
       personaPrefix: { __jsExpr: "process.env.DSH_SYSTEM_PROMPT ?? 'You are a helpful software engineer assistant.'" },
     })
     expect(rows.find(row => row.id === 'agent-loop')?.config).toEqual({ agents: [] })
+    expect(rows.find(row => row.id === 'tool-fs')?.config).toEqual({ read: false, readImage: true, write: false, edit: false })
+    expect(rows.find(row => row.id === 'compaction-basic')?.config).toBeUndefined()
     expect(rows.find(row => row.id === 'terminal-bash')).toMatchObject({
       disabled: { __jsExpr: "process.platform === 'win32'" },
     })

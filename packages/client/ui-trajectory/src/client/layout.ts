@@ -17,7 +17,7 @@ import type {
   TrajectoryCellProps,
   TrajectorySourceBlock,
 } from './trajectory-record.ts'
-import type { TrajectorySnapshot } from './trajectory-contract.ts'
+import type { TrajectoryPartialAssistant, TrajectorySnapshot } from './trajectory-contract.ts'
 import { formatElapsedSeconds } from './trajectory-record.ts'
 import type { TrajectoryTranslate } from './locales.ts'
 import { COMPACTION_INTERRUPTED_ERROR } from './copy-codes.ts'
@@ -169,6 +169,7 @@ function inputCellDetail(node: InputNode, t: TrajectoryTranslate): Pick<
 
 /**
  * Fold a snapshot into turn → Message/Step groups with expanded cells.
+ * Inputs admitted to the same Step retain log order before its response.
  * @param input - nodes plus in-flight partial/runningCalls.
  * @param t - Trajectory locale translator.
  * @returns turns ordered by first appearance.
@@ -324,10 +325,7 @@ export function deriveTrajectoryLayout(
     }
     if (entry.kind === 'system') {
       const { change, request } = entry
-      const turn = change.kind === 'initial'
-        ? firstVisibleTurn(nodes, partial)
-        : enclosingPromptTurn(nodes, change.seq, partial)
-      pushMessage(turn, {
+      const laid: LaidCell = {
         absTime: finiteTime(change.time),
         cell: {
           index: ++index,
@@ -342,7 +340,15 @@ export function deriveTrajectoryLayout(
           timeSeconds: 0,
           startedAt: finiteTime(change.time),
         },
-      })
+      }
+      if (request !== undefined) {
+        pushStepInput(request.turn, request.step, [laid])
+      } else {
+        const turn = change.kind === 'initial'
+          ? firstVisibleTurn(nodes, partial)
+          : enclosingPromptTurn(nodes, change.seq, partial)
+        pushMessage(turn, laid)
+      }
       prevAbsTime = finiteTime(change.time) ?? prevAbsTime
       continue
     }
@@ -400,35 +406,21 @@ export function deriveTrajectoryLayout(
       continue
     }
     const { node, nodeIndex: i } = entry
-    if (node.kind === 'user') {
-      // user/message has no turn on the wire; enclose it in the next assistant
-      // (or partial) turn, else open the turn after the last assistant.
-      const turn = enclosingUserTurn(followingAssistants[i], partial, lastAssistantTurn)
-      pushMessage(turn, {
-        absTime: finiteTime(node.time),
-        cell: {
-          index: ++index,
-          kind: 'user',
-          ...inputCellDetail(node, t),
-          opensTurn: true,
-        },
-      })
-      prevAbsTime = finiteTime(node.time) ?? prevAbsTime
-      continue
-    }
-    if (node.kind === 'steering') {
-      const placement = steeringPlacement(
+    if (node.kind === 'user' || node.kind === 'steering' || node.kind === 'context') {
+      // Without request location, steering stays in the preceding turn; other inputs open the next.
+      const placement = inputPlacement(
         followingAssistants[i],
         partial,
-        lastAssistantTurn,
         eventLocations?.get(node.seq),
+        node.kind === 'steering' ? lastAssistantTurn ?? 1 : (lastAssistantTurn ?? 0) + 1,
       )
-      const laid = {
+      const laid: LaidCell = {
         absTime: finiteTime(node.time),
         cell: {
           index: ++index,
-          kind: 'user' as const,
+          kind: node.kind === 'context' ? 'context' : 'user',
           ...inputCellDetail(node, t),
+          ...(node.kind === 'user' ? { opensTurn: true } : {}),
         },
       }
       if (placement.step === undefined) pushMessage(placement.turn, laid)
@@ -447,19 +439,6 @@ export function deriveTrajectoryLayout(
       if (last !== undefined) index = last.cell.index
       prevAbsTime = finiteTime(node.time) ?? prevAbsTime
       lastAssistantTurn = node.turn
-      continue
-    }
-    if (node.kind === 'context') {
-      const turn = enclosingUserTurn(followingAssistants[i], partial, lastAssistantTurn)
-      pushMessage(turn, {
-        absTime: finiteTime(node.time),
-        cell: {
-          index: ++index,
-          kind: 'context',
-          ...inputCellDetail(node, t),
-        },
-      })
-      prevAbsTime = finiteTime(node.time) ?? prevAbsTime
       continue
     }
     if (node.kind === 'compaction') {
@@ -517,7 +496,7 @@ export function deriveTrajectoryLayout(
       callStartById,
       callById,
       t,
-      { streaming: true },
+      { streaming: true, timing: partial.timing },
     ), t)
     if (partial.step > 0) pushStep(partial.turn, partial.step, laidList)
     else for (const laid of laidList) pushMessage(partial.turn, laid)
@@ -731,14 +710,15 @@ function expandAssistant(
   callStarts: ReadonlyMap<string, number>,
   calls: ReadonlyMap<string, ToolCallBlock>,
   t: TrajectoryTranslate,
-  opts?: { streaming?: boolean },
+  opts?: { streaming?: boolean; timing?: TrajectoryPartialAssistant['timing'] },
 ): LaidCell[] {
   if (opts?.streaming === true && node.blocks.length === 0) return []
   const out: LaidCell[] = []
   let index = startIndex - 1
   const usage = node.usage as UsageLike | undefined
   const streaming = opts?.streaming === true
-  const recordedStart = finiteTime(node.timing?.stepStartTime)
+  const timing = opts?.timing ?? node.timing
+  const recordedStart = finiteTime(timing?.stepStartTime)
   const messageDuration = streaming
     ? null
     : durationSeconds(node.time, recordedStart ?? prevAbsTime)
@@ -767,14 +747,15 @@ function expandAssistant(
     ...(messageText !== '' ? { outputDetail: messageText } : {}),
     ...(thinkingText !== '' ? { thinkingDetail: thinkingText } : {}),
     sourceBlocks: node.blocks.map(block => assistantSourceBlock(block)),
+    ...(node.interrupted === true ? { isError: true } : {}),
     timeSeconds: messageDuration,
     startedAt: recordedStart,
   }
   attachUsage(message, usage)
   message.assistantMetrics = {
-    timingRecorded: node.timing !== undefined,
-    stepStartTime: node.timing?.stepStartTime ?? null,
-    firstTokenTime: node.timing?.firstTokenTime ?? null,
+    timingRecorded: timing !== undefined,
+    stepStartTime: timing?.stepStartTime ?? null,
+    firstTokenTime: timing?.firstTokenTime ?? null,
     completedTime: streaming ? null : finiteTime(node.time),
     usageProvided: usage !== undefined,
     outputTokens: Number.isFinite(usage?.outputTokens) ? usage?.outputTokens ?? null : null,
@@ -897,26 +878,11 @@ function stringifySourceValue(value: unknown): string {
   return json || String(value)
 }
 
-/**
- * Turn that encloses a user/message: next assistant turn, else the
- * in-flight partial, else the turn after the last finalized assistant (or 1).
- */
-function enclosingUserTurn(
+function inputPlacement(
   followingAssistant: AssistantMessageNode | undefined,
   partial: TrajectorySnapshot['partial'],
-  lastAssistantTurn: number | null,
-): number {
-  if (followingAssistant !== undefined) return followingAssistant.turn
-  if (partial !== null) return partial.turn
-  if (lastAssistantTurn !== null) return lastAssistantTurn + 1
-  return 1
-}
-
-function steeringPlacement(
-  followingAssistant: AssistantMessageNode | undefined,
-  partial: TrajectorySnapshot['partial'],
-  lastAssistantTurn: number | null,
   location: ConversationLocation | undefined,
+  fallbackTurn: number,
 ): { turn: number; step?: number } {
   if (location?.kind === 'step') {
     return { turn: location.turn.turn, step: location.step.step }
@@ -933,7 +899,7 @@ function steeringPlacement(
     return { turn: partial.turn, ...(partial.step > 0 ? { step: partial.step } : {}) }
   }
   if (locatedTurn !== undefined) return { turn: locatedTurn }
-  return { turn: lastAssistantTurn ?? 1 }
+  return { turn: fallbackTurn }
 }
 
 function indexFollowingAssistants(

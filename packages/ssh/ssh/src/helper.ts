@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import type { Readable, Writable } from 'node:stream'
 import { Context } from '@deepseek-ai/cordis'
+import { brandString } from '@deepseek-ai/dsh-brand'
 import { FsError, type FsTarget, type FsWriteIntent, type FsVersion } from '@deepseek-ai/dsh-fs'
 import { SandboxedFileSystem } from '@deepseek-ai/dsh-fs-sandbox'
 import type {} from '@deepseek-ai/dsh-subprocess'
@@ -42,6 +43,8 @@ export interface HelperTransport {
   output: Writable
   /** Installed entry whose digest is compared by the client. */
   entryPath: string
+  /** Whether the installed entry includes its own Node and worker runtime. */
+  kind: 'node-script' | 'executable'
   /** Process termination joins the same cleanup as transport loss. */
   signal: AbortSignal
 }
@@ -85,8 +88,14 @@ export async function runSshHelper(transport: HelperTransport): Promise<void> {
   }
   const policy = async (raw: unknown, signal: AbortSignal): Promise<SandboxExecutionPolicy> => {
     const parsed = policySchema.parse(raw)
+    const { sessionId, additionalWritableRoots: additional, ...fields } = parsed
     const target = await ctx.fs.resolve(parsed.workspaceRoot, { signal })
-    return { ...parsed, workspaceRoot: ctx.fs.processPath(target) } as SandboxExecutionPolicy
+    return {
+      ...fields,
+      workspaceRoot: ctx.fs.processPath(target),
+      ...additional === undefined ? {} : { additionalWritableRoots: additional },
+      ...sessionId === undefined ? {} : { sessionId: brandString<NonNullable<SandboxExecutionPolicy['sessionId']>>(sessionId) },
+    }
   }
   const asTarget = (raw: unknown): FsTarget => targetSchema.parse(raw) as FsTarget
   const peer = new SshRpcPeer(transport.input, transport.output, MAX_FRAME_BYTES, 128, async (method, raw, requestSignal) => {
@@ -97,13 +106,14 @@ export async function runSshHelper(transport: HelperTransport): Promise<void> {
         protocol: z.literal(SSH_PROTOCOL_VERSION), workspace: remotePath, leaseMs: z.number().int().min(3000).max(600_000),
         bootstrapPath: remotePath.optional(),
       }).strict().parse(raw)
+      if (transport.kind === 'executable' && input.bootstrapPath !== undefined) throw new Error('Executable SSH helper uses its embedded PTC bootstrap')
       workspace = ctx.fs.processPath(await ctx.fs.resolve(input.workspace, { signal }))
       leaseMs = input.leaseMs
       initialized = true
       touchLease()
       return {
         protocol: SSH_PROTOCOL_VERSION, hash: createHash('sha256').update(readFileSync(transport.entryPath)).digest('hex'),
-        platform: process.platform, nodeVersion: process.version, node: process.execPath, root, workspace,
+        kind: transport.kind, platform: process.platform, nodeVersion: process.version, executable: process.execPath, root, workspace,
         ...(input.bootstrapPath === undefined ? {} : { bootstrapHash: createHash('sha256').update(readFileSync(input.bootstrapPath)).digest('hex') }),
       }
     }

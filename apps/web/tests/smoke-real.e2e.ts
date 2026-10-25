@@ -30,6 +30,8 @@ import WebSocket from 'ws'
 import { REPO_ROOT, connectFreshWorkspace, newEnglishPage, probeFreePort, requireDist, saveFailureShot } from './support.ts'
 
 const WEB_SURFACE_PROMPT = fileURLToPath(new URL('./expected/web-runtime-context/web-surface-prompt.expected.md', import.meta.url))
+/** Framed user text that marks the auxiliary title request's own messages. */
+const TITLE_PROMPT_MARKER = 'Generate the session title from this JSON array of human messages'
 const authenticatedCookies = new Map<string, Promise<{ origin: string; cookie: string }>>()
 
 /** Frame a complete text turn or an open block before a transport failure. */
@@ -474,8 +476,13 @@ describe('dsh web keyless CLI smoke', () => {
         .flatMap(message => message.content ?? [])
         .find(block => block.type === 'text' && block.text?.includes('web-workspace-context-probe'))
       const expectedWebSection = readFileSync(WEB_SURFACE_PROMPT, 'utf8').trimEnd()
-        .replace('{{webUrl}}', new URL(baseUrl).origin)
       expect(captured.system).toContain(expectedWebSection)
+      expect(captured.system).not.toContain(new URL(baseUrl).origin)
+      expect(captured.messages?.filter(message => message.role === 'user')
+        .flatMap(message => message.content ?? [])
+        .some(block => block.type === 'text'
+          && block.text?.includes(`Current DeepSeek Harness Web GUI URL: ${JSON.stringify(new URL(baseUrl).origin)}.`)))
+        .toBe(true)
       expect(workspaceMessage).toMatchInlineSnapshot(`
         {
           "text": "<system-reminder>
@@ -519,8 +526,11 @@ describe('dsh web keyless CLI smoke', () => {
       request.setEncoding('utf8')
       request.on('data', (chunk: string) => { body += chunk })
       request.on('end', () => {
-        const parsed = JSON.parse(body) as { max_tokens?: number; messages?: unknown[] }
-        const titleRequest = parsed.max_tokens === 64
+        // The request body also carries the session log, whose recorded title
+        // request contains the marker, so only this request's own messages
+        // decide what the request is.
+        const parsed = JSON.parse(body) as { messages?: unknown[] }
+        const titleRequest = JSON.stringify(parsed.messages ?? null).includes(TITLE_PROMPT_MARKER)
         const mainRequest = !titleRequest && body.includes(promptMarker)
         response.writeHead(200, { 'content-type': 'text/event-stream' })
         if (!mainRequest) {
@@ -593,7 +603,7 @@ describe('dsh web keyless CLI smoke', () => {
     }
   }, 120_000)
 
-  it('DSH_TOOLS_MODE=ptc collapses the provider wire tools to run_code with the SDK prompt section', async () => {
+  it.each(['native', 'ptc'] as const)('selects the %s executor through profile overlays and ignores the retired environment selector', async (mode) => {
     requireDist()
     const workspace = mkdtempSync(join(tmpdir(), 'dsh-web-ptc-'))
 
@@ -622,14 +632,17 @@ describe('dsh web keyless CLI smoke', () => {
     const tsxLoader = pathToFileURL(createRequire(join(REPO_ROOT, 'package.json')).resolve('tsx')).href
     const child = spawn(
       process.execPath,
-      ['--import', tsxLoader, join(REPO_ROOT, 'apps/cli/src/bin.ts'), 'web', '--no-open', '--port', '0'],
+      ['--import', tsxLoader, join(REPO_ROOT, 'apps/cli/src/bin.ts'), 'web',
+        ...mode === 'ptc' ? ['--patch', join(REPO_ROOT, 'apps/cli/config/examples/ptc.yml')] : [],
+        '--no-open', '--port', '0',
+      ],
       {
         cwd: workspace,
         env: {
           ...process.env,
           DEEPSEEK_API_KEY: 'keyless-web-ptc',
           DEEPSEEK_BASE_URL: `http://127.0.0.1:${address.port}`,
-          DSH_TOOLS_MODE: 'ptc',
+          DSH_TOOLS_MODE: mode === 'native' ? 'ptc' : 'native',
           DSH_HOME: join(workspace, '.dsh'),
           DSH_AGENTS_HOME: join(workspace, '.agents'),
           TSX_TSCONFIG_PATH: join(REPO_ROOT, 'tsconfig.json'),
@@ -652,9 +665,15 @@ describe('dsh web keyless CLI smoke', () => {
           setTimeout(() => { reject(new Error('provider request not received in 10s')) }, 10_000).unref()
         }),
       ])
-      expect(captured.tools?.map(tool => tool.name)).toEqual(['run_code'])
-      expect(captured.system).toContain('## Writing code for run_code')
-      expect(captured.system).toContain('declare const tools')
+      if (mode === 'ptc') {
+        expect(captured.tools?.map(tool => tool.name)).toEqual(['run_code'])
+        expect(captured.system).toContain('## Writing code for run_code')
+        expect(captured.system).toContain('declare const tools')
+      } else {
+        expect(captured.tools?.map(tool => tool.name)).not.toContain('run_code')
+        expect(captured.tools?.length).toBeGreaterThan(0)
+        expect(captured.system).not.toContain('## Writing code for run_code')
+      }
     } finally {
       const closed = child.exitCode === null
         ? new Promise<void>((resolveClose) => { child.once('close', () => { resolveClose() }) })
