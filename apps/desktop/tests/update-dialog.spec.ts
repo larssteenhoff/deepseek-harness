@@ -88,7 +88,7 @@ it('attaches within its owner and resizes below the Windows caption without a na
   const pending = f.show()
   const view = fixture.views[0]!
   expect(f.parent.contentView.addChildView).toHaveBeenCalledWith(view)
-  expect(view.options).toMatchObject({ webPreferences: { preload: 'preload-update-dialog.cjs', sandbox: true, contextIsolation: true } })
+  expect(view.options).toMatchObject({ webPreferences: { preload: 'preload-update-dialog.cjs', sandbox: true, contextIsolation: true, minimumFontSize: 12 } })
   expect(view.setBackgroundColor).toHaveBeenCalledWith('#00000000')
   const top = process.platform === 'win32' ? 40 : 0
   expect(view.setBounds).toHaveBeenCalledWith({ x: 0, y: top, width: 900, height: 650 - top })

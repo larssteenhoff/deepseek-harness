@@ -852,7 +852,7 @@ describe('desktop main startup', () => {
     expect(refreshed.filter(item => item.role === 'toggleDevTools' && item.visible !== false)).toEqual([
       { role: 'toggleDevTools', label: nextLocale === 'en' ? en.toggleDevToolsMenu : zh.toggleDevToolsMenu },
     ])
-    expect(harness.windows[0]!.options).toMatchObject({ webPreferences: { devTools: true } })
+    expect(harness.windows[0]!.options).toMatchObject({ webPreferences: { devTools: true, minimumFontSize: 12 } })
   })
 
   it.each([
