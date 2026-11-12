@@ -136,7 +136,7 @@ Web、headless 与 SDK 继承 base bundle 的原生工具执行；使用 [PTC ov
 
 ## 共享部署行为
 
-基础组合包挂载原生 DeepSeek 适配器、settings 与凭据提供方、稳定的 `web_search` 和 `web_fetch`、HTTP fetch 提供方。随附 profile 不装配会话日志上传、插件清单、OTel 会话导出或产品埋点导出器。提供方凭据依次从继承环境、`$DSH_HOME/.credentials.yaml`、调用目录的 `.env` 和 `$DSH_HOME/.env` 解析；受管文档从不物化进 `process.env`，而两个 `.env` 文件都是普通启动环境层。搜索使用 `DEEPSEEK_API_KEY` 并接受 `DEEPSEEK_SEARCH_BASE_URL`。已启用的抓取调用会在所有 sandbox 与审批模式下执行，无需逐次确认；提供方可以访问 loopback 与内网主机。Web app 会禁用 base 工具配置项，再通过 `cordis`、`ptc` 与 `standard` agent preset 暴露相同工具。
+基础组合包挂载原生 DeepSeek 适配器、settings 与凭据提供方、稳定的 `web_search` 和 `web_fetch`、HTTP fetch 提供方，默认开启的 DeepSeek 会话日志上传，以及面向所有用户的反馈门控 OTel 上传。提供方凭据依次从继承环境、`$DSH_HOME/.credentials.yaml`、调用目录的 `.env` 和 `$DSH_HOME/.env` 解析；受管文档从不物化进 `process.env`，而两个 `.env` 文件都是普通启动环境层。DeepSeek Search 与 Fetch API 跟随会话的 DeepSeek 凭据；自定义 endpoint 和密钥只能在 YAML 中通过 `web-deepseek-api.searchBaseURL` / `searchApiKeyEnv` 和 `fetchBaseURL` / `fetchApiKeyEnv` 设置（[鉴权](../../../packages/web/web-deepseek-api/README.zh.md#authentication)）。旧版 Messages 搜索读取 `DEEPSEEK_SEARCH_BASE_URL`。已启用的抓取调用会在所有 sandbox 与审批模式下执行，无需逐次确认，并且可以访问 loopback 与内网主机。Web app 会禁用 base 工具配置项，再通过 `cordis`、`ptc` 与 `standard` agent preset 暴露相同工具。
 
 反馈会记录在本地 Session Log 中，不会启动模型工作。普通模型请求仍会将提示词与上下文发送给所选模型提供方。
 
@@ -145,4 +145,4 @@ Web、headless 与 SDK 继承 base bundle 的原生工具执行；使用 [PTC ov
 <a id="source-execution"></a>
 ## 源码执行
 
-请在仓库根目录中，于全新 checkout 之后及产物需要更新时单独运行 `pnpm run build`，然后使用 `pnpm dsh <args...>`。`package.json` 中的脚本不会构建，而是通过 `node --import tsx/esm` 启动 `apps/cli/src/bin.ts`，并转发所有参数。Typert Host 产物缺失时，profile 启动会因不含构建指引的模块解析错误而失败。这些 Host 产物存在后，如果前端或 Client plugin 组合包缺失，启动会失败并提示运行 `pnpm run build`。启动器不会检查产物是否为最新，因此已有的陈旧组合包可能继续运行旧版浏览器代码，直至重新构建。该进程会继承启动环境，且 `runProfile` 会在任何 entry 挂载之前从该快照解析出站代理，因此 `HTTP_PROXY`／`HTTPS_PROXY`（以及写在 `.env` 层中的代理）无需任何额外开关即可生效。源码入口显式选择链接式 profile 解析，使 tsx workspace 导入与 profile 插件共享模块身份。安装形式会使用 runtime profile 解析直接启动构建后的 `apps/cli/lib/bin.js`，不会重新构建仓库。
+请在仓库根目录中，于全新 checkout 之后及产物需要更新时单独运行 `pnpm run build`，然后使用 `pnpm dsh <args...>`。`package.json` 中的脚本不会构建，而是通过 `node --import tsx/esm` 启动 `apps/cli/src/bin.ts`，并转发所有参数。Typert Host 产物缺失时，profile 启动会因不含构建指引的模块解析错误而失败。这些 Host 产物存在后，如果前端或 Client plugin 组合包缺失，启动会失败并提示运行 `pnpm run build`。启动器不会检查产物是否为最新，因此已有的陈旧组合包可能继续运行旧版浏览器代码，直至重新构建。该进程会继承启动环境，且 `runProfile` 会在任何 entry 挂载之前从该快照解析出站代理，因此 `HTTP_PROXY`／`HTTPS_PROXY`（以及写在 `.env` 层中的代理）无需任何额外开关即可生效。源码入口显式选择链接式 profile 解析，使 tsx workspace 导入与 profile 插件共享模块身份。在 Windows 上，安装版命令在加载 profile 依赖前展开 8.3 短路径。安装形式会使用 runtime profile 解析直接启动构建后的 `apps/cli/lib/bin.js`，不会重新构建仓库。

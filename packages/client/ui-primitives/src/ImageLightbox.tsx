@@ -1,3 +1,4 @@
+import type { HTMLAttributes } from 'react'
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import css from './ImageLightbox.module.css'
@@ -20,14 +21,16 @@ export interface ImageLightboxLabels {
  * @param props.src - the original image URL.
  * @param props.alt - the image's alt text.
  * @param props.labels - dialog and close-control strings.
+ * @param props.contextMenuProps - optional original-image gesture bindings.
  * @param props.onClose - dismiss callback owned by the opener.
  * @returns the modal preview dialog.
  */
-export function ImageLightbox({ src, alt, labels, onClose }: {
+export function ImageLightbox({ src, alt, labels, onClose, contextMenuProps }: {
   src: string
   alt: string
   labels: ImageLightboxLabels
   onClose: () => void
+  contextMenuProps?: Pick<HTMLAttributes<HTMLElement>, 'onContextMenu' | 'onKeyDown' | 'tabIndex'> | undefined
 }) {
   const imageRef = useRef<HTMLImageElement | null>(null)
   const restoreRef = useRef<HTMLElement | null>(null)
@@ -36,6 +39,8 @@ export function ImageLightbox({ src, alt, labels, onClose }: {
     restoreRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     imageRef.current?.focus()
     const onKeyDown = (event: globalThis.KeyboardEvent): void => {
+      // A portaled image menu owns Escape and Tab until it returns focus.
+      if (event.defaultPrevented || document.activeElement?.closest('[role="menu"]')) return
       if (event.key === 'Escape') { event.stopPropagation(); onClose() }
       if (event.key === 'Tab') { event.preventDefault(); imageRef.current?.focus() }
     }
@@ -55,7 +60,7 @@ export function ImageLightbox({ src, alt, labels, onClose }: {
     >
       <div className={css.stage}>
         <div className={css.mask} aria-hidden="true" onMouseDown={onClose} />
-        <img ref={imageRef} className={css.image} src={src} alt={alt} tabIndex={-1} onClick={onClose} />
+        <img ref={imageRef} className={css.image} src={src} alt={alt} {...contextMenuProps} tabIndex={-1} onClick={onClose} />
       </div>
     </div>,
     document.body,

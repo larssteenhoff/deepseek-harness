@@ -24,6 +24,12 @@ function productIcon(glyph: IconGlyph, weight: IconWeight): (props: IconProps) =
   )
 }
 
+/** Regular one-pixel IconLayersOutline artwork. */
+export const IconLayersOutlineRegular = productIcon('layers-outline', 'regular')
+
+/** Medium IconLayersOutline artwork with a 1.3px stroke. */
+export const IconLayersOutlineMedium = productIcon('layers-outline', 'medium')
+
 /** Regular one-pixel IconNewChatOutline artwork. */
 export const IconNewChatOutlineRegular = productIcon('new-chat-outline', 'regular')
 
@@ -35,6 +41,18 @@ export const IconSearchOutlineRegular = productIcon('search-outline', 'regular')
 
 /** Medium IconSearchOutline artwork with a 1.3px stroke. */
 export const IconSearchOutlineMedium = productIcon('search-outline', 'medium')
+
+/** Regular one-pixel IconEyeOutline artwork. */
+export const IconEyeOutlineRegular = productIcon('eye-outline', 'regular')
+
+/** Medium IconEyeOutline artwork with a 1.3px stroke. */
+export const IconEyeOutlineMedium = productIcon('eye-outline', 'medium')
+
+/** Regular one-pixel IconEyeOffOutline artwork. */
+export const IconEyeOffOutlineRegular = productIcon('eye-off-outline', 'regular')
+
+/** Medium IconEyeOffOutline artwork with a 1.3px stroke. */
+export const IconEyeOffOutlineMedium = productIcon('eye-off-outline', 'medium')
 
 /** Regular one-pixel IconGlobeOutline artwork. */
 export const IconGlobeOutlineRegular = productIcon('globe-outline', 'regular')
@@ -608,3 +626,9 @@ export const IconAppsAddOutlineRegular = appsAddIcon('regular')
 
 /** Three entry tiles and an add mark with 1.3px strokes. */
 export const IconAppsAddOutlineMedium = appsAddIcon('medium')
+
+/** Regular floppy-disk save action. */
+export const IconSaveOutlineRegular = productIcon('save-outline', 'regular')
+
+/** Medium floppy-disk save action. */
+export const IconSaveOutlineMedium = productIcon('save-outline', 'medium')

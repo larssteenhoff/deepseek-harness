@@ -1,19 +1,19 @@
 /** Direct Settings launcher for the sidebar footer. */
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { IconSettingsOutlineMedium, Toast } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale, PropsRuntime, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { AccountSectionInjected } from './AccountSection.tsx'
 import { SignInDialog } from './SignInDialog.tsx'
-import { AccountNoticeStack } from './AccountNotice.tsx'
+import type {} from './account-ui.ts'
 import css from './AccountMenu.module.css'
 
 /** Settings trigger composed by the settings shell. */
-export type AccountMenuProps = PropsRuntime<'settings.launcher'> & PropsLocale<'settings.account'> & InjectFace<AccountSectionInjected>
+export type AccountMenuProps = PropsRuntime<'settings.launcher'> & PropsRenderSlots<'settings.launcher.notifications'> & PropsLocale<'settings.account'> & InjectFace<AccountSectionInjected>
 
 /** @param props - sidebar geometry, settings navigation, and account notices. @returns direct Settings button. */
 export function AccountMenu({
   subscribeSessionExpired, subscribeModelSignInRequired, wide, settingsShortcut, openSettings, settingsOpen,
-  refreshAccount, showLogin, openOnboarding, start, cancel, bonusNoticeShown, bonusNoticeDismissed,
+  refreshAccount, showLogin, openOnboarding, start, cancel, renderSlot,
   readCodexWeeklyQuota, useAccount, useTheme, t,
 }: AccountMenuProps) {
   const anchor = useRef<HTMLDivElement>(null)
@@ -36,6 +36,7 @@ export function AccountMenu({
     const interval = window.setInterval(refresh, 5 * 60_000)
     return () => { active = false; window.clearInterval(interval) }
   }, [readCodexWeeklyQuota])
+  const openAccount = useCallback(() => { openSettings('account') }, [openSettings])
   const signedIn = account.view?.status === 'credential-stored'
   const settingsWasOpen = useRef(false)
   useEffect(() => {
@@ -45,10 +46,9 @@ export function AccountMenu({
   return <div ref={anchor} className={css.root}>
     {signInNotice > 0 && <Toast key={signInNotice} text={t('modelSignInRequired')} onDone={() => { setSignInNotice(0) }} />}
     {expiryNotice && <Toast text={t('sessionExpired')} onDone={() => { setExpiryNotice(false) }} />}
-    {signedIn && !account.desktopOnboardingVisible && !account.onboarding && account.notices && <AccountNoticeStack
-      notices={account.notices}
-      anchor={anchor} title={t('bonusNoticeTitle')} closeLabel={t('close')}
-      onShown={bonusNoticeShown} onDismiss={bonusNoticeDismissed} />}
+    <div hidden={!wide}>{renderSlot('settings.launcher.notifications', {
+      active: signedIn && !account.desktopOnboardingVisible && !account.onboarding, openAccount,
+    })}</div>
     {wide && weeklyQuota !== null && <div className={css.quota}
       title={weeklyQuota.resetsAt === null ? undefined : new Date(weeklyQuota.resetsAt * 1000).toLocaleString()}>
       <span className={css.quotaLabel}>{t('openaiWeeklyUsage')}</span>
@@ -56,7 +56,7 @@ export function AccountMenu({
     </div>}
     <button type="button" className={css.trigger} data-collapsed={!wide} data-row="true"
       aria-label={t('settings')} aria-keyshortcuts={settingsShortcut?.aria}
-      aria-haspopup="dialog" aria-expanded={settingsOpen} onClick={openSettings}>
+      aria-haspopup="dialog" aria-expanded={settingsOpen} onClick={() => { openSettings() }}>
       <IconSettingsOutlineMedium size={16} />
       {wide && <span className={css.label}>{t('settings')}</span>}
     </button>

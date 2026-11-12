@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { contextMenuHook } from '@deepseek-ai/dsh-client-test-runtime'
 import type { ShortcutCatalogEntry, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -116,6 +117,7 @@ function mount({
     usePanelInfo, useSessionRetainInfo: () => undefined, useResource,
     useWorkspaces: unusedHook,
     ...allowAllAccess,
+    useContextMenu: contextMenuHook(),
     wide,
     reconnect,
     openDesktopUpdate: () => {},
@@ -520,6 +522,14 @@ it('opens Account from the contributed sidebar launcher', () => {
   expect(renderSlot.mock.calls.filter(call => call[0] === 'settings.launcher').at(-1)?.[1]).toMatchObject({ settingsOpen: true })
   fireEvent.keyDown(document, { key: 'Escape' })
   expect(renderSlot.mock.calls.filter(call => call[0] === 'settings.launcher').at(-1)?.[1]).toMatchObject({ settingsOpen: false })
+})
+
+it('opens the section requested by the contributed sidebar launcher', () => {
+  const { renderSlot } = mount({ rows: [{ id: 'general', order: 0, label: 'General' }, { id: 'account', order: 1, label: 'Account' }] })
+  const launcher = renderSlot.mock.calls.find(call => call[0] === 'settings.launcher')!
+  act(() => { (launcher[1] as { openSettings: (sectionId?: string) => void }).openSettings('account') })
+  expect(screen.getByTestId('section-account')).toBeTruthy()
+  expect(screen.queryByTestId('section-general')).toBeNull()
 })
 
 it('shows the effective settings binding on the compact rail without adding a wide-row hover label', () => {
