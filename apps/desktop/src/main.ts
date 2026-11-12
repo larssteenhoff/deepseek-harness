@@ -1,5 +1,6 @@
 /** Electron shell: desktop project ownership, custom protocol, windows, and lifecycle. */
 
+import { APP_MINIMUM_FONT_SIZE } from './typography.ts'
 import { QwenServer } from './qwen-server.ts'
 import { GpuMemoryLimit, gpuLimitTarget } from './gpu-memory-limit.ts'
 import { totalmem, userInfo } from 'node:os'
@@ -291,6 +292,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
       webSecurity: true,
       webviewTag: primary,
       devTools: true,
+      minimumFontSize: APP_MINIMUM_FONT_SIZE,
     },
   })
   window.webContents.setWindowOpenHandler(({ url }) => {

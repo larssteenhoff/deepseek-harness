@@ -1,4 +1,5 @@
 /** Isolated update documents share their owner's native window and input lifetime. */
+import { APP_MINIMUM_FONT_SIZE } from './typography.ts'
 import { WebContentsView, type BrowserWindow, type WebContents, type View } from 'electron'
 import type { EventEmitter } from 'node:events'
 import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
@@ -40,6 +41,7 @@ export class DesktopUpdateOverlays {
   create(parent: UpdateOwner, preload: string): DesktopUpdateOverlay {
     const view = new WebContentsView({ webPreferences: {
       preload, contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true,
+      minimumFontSize: APP_MINIMUM_FONT_SIZE,
     } })
     const ownerContents = parent.webContents
     const contents = view.webContents

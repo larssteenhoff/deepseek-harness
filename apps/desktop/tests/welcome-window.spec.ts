@@ -56,7 +56,7 @@ describe('desktop welcome window', () => {
       width: 600, height: 700, useContentSize: true, center: true, show: false,
       resizable: false, maximizable: false, fullscreenable: false,
       webPreferences: {
-        nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true,
+        nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, minimumFontSize: 12,
         additionalArguments: ['--dsh-welcome-locale=zh-CN'],
       },
     })

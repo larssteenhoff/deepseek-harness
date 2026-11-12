@@ -1,6 +1,7 @@
 import type { SignInAttemptId } from '@deepseek-ai/dsh-deepseek-account/types'
 /** Native welcome window and its presentation-only renderer. */
 
+import { APP_MINIMUM_FONT_SIZE } from './typography.ts'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, ipcMain, type BrowserWindowConstructorOptions, type IpcMainInvokeEvent } from 'electron'
@@ -43,6 +44,7 @@ export function welcomeWindowOptions(platform: NodeJS.Platform, locale: DesktopL
       contextIsolation: true,
       sandbox: true,
       webSecurity: true,
+      minimumFontSize: APP_MINIMUM_FONT_SIZE,
     },
   }
 }
