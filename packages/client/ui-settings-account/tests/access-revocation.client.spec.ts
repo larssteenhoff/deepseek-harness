@@ -114,7 +114,7 @@ it('withdraws every account surface and the account stream on revocation, and re
   }
 })
 
-it('drops reads a revoked grant started, and the next grant shows no account section before its first frame', async () => {
+it('drops reads a revoked grant started, and the next grant shows the account section at once', async () => {
   vi.stubEnv('DSH_CLIENT_VERSION', '0.0.0-test')
   const links = { usageUrl: 'https://example.test/usage', topUpUrl: 'https://example.test/top_up' }
   const signedIn: AccountView = { status: 'credential-stored', links, attempt: null }
@@ -187,8 +187,9 @@ it('drops reads a revoked grant started, and the next grant shows no account sec
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(operations!.hooks.account.getSnapshot().details).toBeUndefined()
 
+    // The Account section shows in every account state, so it returns with the grant, before the first frame.
     grant(guards)
-    expect(registered.get('settings.section')).toBe(0)
+    expect(registered.get('settings.section')).toBe(1)
     firstFrames[1]!.release()
     await firstFrames[1]!.accepted
     expect(registered.get('settings.section')).toBe(1)
