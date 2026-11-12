@@ -389,7 +389,7 @@ export function SidebarRoot({
           >
             <span className={css.newSessionLabelMask}><span className={css.newSessionContent}>
               {wide
-                ? <IconPlusOutlineMedium size={14} />
+                ? <IconPlusOutlineMedium size={16} />
                 : <IconPlusOutlineMedium size={windowsTitlebar ? 16 : 18} />}
               {wide && <span className={clsx(css.newSessionLabel, css.wide)}>{t('session.new')}</span>}
             </span></span>
