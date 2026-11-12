@@ -43,6 +43,8 @@ export const remoteDefaultResponses: RemoteTable = {
     'account/getNotifications': ok(null),
     'account/getNotificationContent': ok(null),
     'account/reportNotificationEvent': ok(true),
+    // ui-settings-account launcher reads the ChatGPT/Codex weekly quota when it mounts; `null` hides the quota row.
+    'session/codexWeeklyQuota': ok(null),
   },
   // Stream endpoints the roster opens later than boot; declared so a spec that forgets the script gets a stream miss.
   streams: [
