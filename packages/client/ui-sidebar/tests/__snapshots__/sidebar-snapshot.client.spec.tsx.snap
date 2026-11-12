@@ -191,8 +191,8 @@ exports[`sidebar shell snapshots > renders Windows caption controls in expanded 
             aria-hidden="true"
             data-content="ebc5d6eb"
             data-icon="dsw-icon-plus-outline-medium"
-            height="14"
-            width="14"
+            height="16"
+            width="16"
           />
           <span
             class="newSessionLabel wide"
@@ -471,8 +471,8 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
             aria-hidden="true"
             data-content="ebc5d6eb"
             data-icon="dsw-icon-plus-outline-medium"
-            height="14"
-            width="14"
+            height="16"
+            width="16"
           />
           <span
             class="newSessionLabel wide"
@@ -632,8 +632,8 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
             aria-hidden="true"
             data-content="ebc5d6eb"
             data-icon="dsw-icon-plus-outline-medium"
-            height="14"
-            width="14"
+            height="16"
+            width="16"
           />
           <span
             class="newSessionLabel wide"

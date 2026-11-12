@@ -864,3 +864,27 @@
     animation: none;
   }
 }
+
+/* Desktop customization: in the wide sidebar, New Session is a plain row with the
+   panel entries' inset and padding, left-aligned glyph and label, and hover fill; collapsed keeps the rail icon. */
+.root:not(.collapsed) .newSession {
+  justify-content: flex-start;
+  height: auto;
+  min-height: 32px;
+  margin: 0 var(--dsh-sidebar-paint-inset);
+  padding: 5px calc(var(--dsh-sidebar-row-padding) - var(--dsh-sidebar-paint-inset));
+  border: none;
+  background: transparent;
+  font-weight: 400;
+}
+
+@media (hover: hover) {
+  .root:not(.collapsed) .newSession:hover {
+    background-color: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+.root:not(.collapsed) .newSessionContent {
+  justify-content: flex-start;
+  gap: var(--dsh-sidebar-label-gap);
+}
