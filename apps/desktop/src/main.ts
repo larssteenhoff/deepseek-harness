@@ -1,5 +1,8 @@
 /** Electron shell: desktop project ownership, custom protocol, windows, and lifecycle. */
 
+import { QwenServer } from './qwen-server.ts'
+import { GpuMemoryLimit, gpuLimitTarget } from './gpu-memory-limit.ts'
+import { totalmem, userInfo } from 'node:os'
 import { installFileActions } from './file-actions.ts'
 import { configurationFailure, channelSaveFailure, configurationMessage } from './update-configuration.ts'
 import type { DesktopChannelState, DesktopChannelChangeResult } from '@deepseek-ai/dsh-client-ui-settings-general/types'
@@ -720,6 +723,7 @@ async function main(): Promise<void> {
         if (stopFailure !== undefined) throw new DesktopUpdatePreparationError('stop-failed', locale.messages.updateStopFailed, stopFailure.message)
         await operationJournal?.drain(500)
         updateJournal?.action('install-confirmed')
+        await qwenServer.close()
         shellInstallerOwnsQuit = true
       } catch (error) {
         operationReportsStopping = shuttingDown
@@ -851,6 +855,21 @@ async function main(): Promise<void> {
     platformView.setBounds(platformBounds(bounds))
   })
   ipcMain.handle(PLATFORM_IPC.close, (event) => { assertMainApplication(event); platformView.close() })
+  const qwenServer = new QwenServer(join(app.getPath('userData'), 'qwen-server.json'), () => loginShell,
+    new GpuMemoryLimit(gpuLimitTarget(totalmem()), userInfo().username))
+  const qwenReady = qwenServer.initialize().catch((error: unknown) => { console.error('Qwen initialization failed', error) })
+  ipcMain.handle(DESKTOP_IPC.qwenStatus, async (event) => { assertMainApplication(event); await qwenReady; return qwenServer.status() })
+  ipcMain.handle(DESKTOP_IPC.qwenStart, async (event) => { assertMainApplication(event); await qwenReady; return qwenServer.start() })
+  ipcMain.handle(DESKTOP_IPC.qwenStop, async (event) => { assertMainApplication(event); await qwenReady; return qwenServer.stop() })
+  ipcMain.handle(DESKTOP_IPC.qwenConfigure, async (event, value: unknown) => {
+    assertMainApplication(event)
+    if (typeof value !== 'object' || value === null || !('autoStart' in value) || !('stopOnExit' in value)
+      || !('raiseGpuLimit' in value) || typeof value.autoStart !== 'boolean' || typeof value.stopOnExit !== 'boolean'
+      || typeof value.raiseGpuLimit !== 'boolean') throw new Error('Invalid Qwen preferences')
+    await qwenReady
+    return qwenServer.configure({ autoStart: value.autoStart, stopOnExit: value.stopOnExit, raiseGpuLimit: value.raiseGpuLimit })
+  })
+
   // Only the main window may synchronize its palette with the native material.
   ipcMain.on(DESKTOP_IPC.nativeThemeSet, (event, source: unknown) => {
     if (mainWindow === undefined || event.sender !== mainWindow.webContents
@@ -1484,7 +1503,8 @@ async function main(): Promise<void> {
     updateSchedule.dispose()
     updateDialog.dispose()
     mandatoryUI?.dispose()
-    void Promise.all([stopOperationReports(), Promise.resolve(mandatoryPolicy?.dispose()).then(() => policyAuth?.dispose()),
+    void Promise.all([qwenServer.close(), stopOperationReports(),
+      Promise.resolve(mandatoryPolicy?.dispose()).then(() => policyAuth?.dispose()),
       backend.close().then(async () => { await operationJournal?.drain(500) }, async (error: unknown) => {
         await operationJournal?.drain(500)
         throw error
