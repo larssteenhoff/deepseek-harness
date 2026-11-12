@@ -72,3 +72,27 @@ export interface DesktopChannelBridge {
    */
   subscribe(listener: (state: DesktopChannelState) => void): () => void
 }
+
+/** Persisted local Qwen server lifecycle preferences. */
+export interface QwenServerPreferences {
+  readonly autoStart: boolean
+  readonly stopOnExit: boolean
+  /** Raise the macOS GPU memory limit while Harness is open; files without this field read as `false`. */
+  readonly raiseGpuLimit: boolean
+}
+/** Local server availability; external servers are outside Harness process ownership. */
+export interface QwenServerState extends QwenServerPreferences {
+  readonly phase: 'stopped' | 'starting' | 'running' | 'stopping' | 'external' | 'error'
+  readonly failure?: 'start' | 'settings'
+  /** `unchanged`: another non-default limit was already set and stays as it is. */
+  readonly gpuLimit: 'off' | 'raised' | 'unchanged' | 'error'
+  /** Limit in MiB that Harness sets, computed from physical memory. */
+  readonly gpuLimitMb: number
+}
+/** Desktop-only local server operations. */
+export interface QwenServerBridge {
+  status(): Promise<QwenServerState>
+  start(): Promise<QwenServerState>
+  stop(): Promise<QwenServerState>
+  configure(preferences: QwenServerPreferences): Promise<QwenServerState>
+}
