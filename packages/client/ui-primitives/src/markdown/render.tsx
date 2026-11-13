@@ -711,13 +711,23 @@ function LoadedMarkdownImage({ src, alt, destination, preview }: {
   const { getTriggerProps } = useMarkdownDelegate()
   const [failed, setFailed] = useState(false)
   const [open, setOpen] = useState(false)
+  const [dimensions, setDimensions] = useState<{ readonly width: number; readonly height: number }>()
   const close = useCallback(() => { setOpen(false) }, [])
   if (failed) return <span className={css.imageAlt}>{preview === undefined ? '' : `${preview.labels.failed} · `}{alt || destination}</span>
   const file = parseFileLink(destination)
   const contextMenuProps = getTriggerProps?.({ kind: 'image', url: src, ...(file === undefined ? {} : { path: file.path }) })
   const imageProps = { className: css.image, src, alt, onError: () => { setFailed(true) },
+    onLoad: (event: React.SyntheticEvent<HTMLImageElement>) => {
+      const { naturalWidth: width, naturalHeight: height } = event.currentTarget
+      if (width > 0 && height > 0) setDimensions({ width, height })
+    },
     loading: 'lazy' as const, decoding: 'async' as const, referrerPolicy: 'no-referrer' as const }
-  if (preview === undefined) return <img {...imageProps} {...contextMenuProps} />
+  const resolution = dimensions === undefined ? null : (
+    <span className={css.imageResolution}>{dimensions.width} × {dimensions.height} px</span>
+  )
+  if (preview === undefined) return (
+    <span className={css.imageWithResolution}><img {...imageProps} {...contextMenuProps} />{resolution}</span>
+  )
   const localFileName = file?.path.split(/[\\/]/u).at(-1)
   const urlFileName = destination.split('/').at(-1)?.split(/[?#]/u)[0]
   const exportName = localFileName || urlFileName || 'image'
@@ -728,10 +738,13 @@ function LoadedMarkdownImage({ src, alt, destination, preview }: {
     name={exportName}
   />
   return <>
-    <button type="button" className={css.imageButton} title={preview.labels.open}
-      {...contextMenuProps}
-      aria-label={alt ? `${preview.labels.open}: ${alt}` : preview.labels.open}
-      onClick={() => { setOpen(true) }}>{img}</button>
+    <span className={css.imageWithResolution}>
+      <button type="button" className={css.imageButton} title={preview.labels.open}
+        {...contextMenuProps}
+        aria-label={alt ? `${preview.labels.open}: ${alt}` : preview.labels.open}
+        onClick={() => { setOpen(true) }}>{img}</button>
+      {resolution}
+    </span>
     {open && <ImageLightbox src={src} alt={alt} labels={preview.labels} onClose={close} contextMenuProps={contextMenuProps} />}
   </>
 }

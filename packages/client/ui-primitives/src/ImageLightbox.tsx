@@ -1,7 +1,6 @@
 import type { HTMLAttributes } from 'react'
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { IconCloseOutlineRegular } from './icons/index.tsx'
 import css from './ImageLightbox.module.css'
 
 /** Lightbox strings the owner resolves from its own locale namespace. */
@@ -14,8 +13,8 @@ export interface ImageLightboxLabels {
 
 /**
  * Document-level original-image preview opened by clicking a thumbnail.
- * Closes on Escape, backdrop press, or the close control, and restores focus
- * to the opener on unmount. Rendered through a body portal: an opener inside
+ * Closes on Escape, backdrop press, or image click, and restores
+ * focus to the opener on unmount. Rendered through a body portal: an opener inside
  * a transformed or filtered ancestor would otherwise trap the fixed backdrop
  * in that ancestor's box instead of covering the viewport.
  *
@@ -33,17 +32,17 @@ export function ImageLightbox({ src, alt, labels, onClose, contextMenuProps }: {
   onClose: () => void
   contextMenuProps?: Pick<HTMLAttributes<HTMLElement>, 'onContextMenu' | 'onKeyDown' | 'tabIndex'> | undefined
 }) {
-  const closeRef = useRef<HTMLButtonElement | null>(null)
+  const imageRef = useRef<HTMLImageElement | null>(null)
   const restoreRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     restoreRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    closeRef.current?.focus()
+    imageRef.current?.focus()
     const onKeyDown = (event: globalThis.KeyboardEvent): void => {
       // A portaled image menu owns Escape and Tab until it returns focus.
       if (event.defaultPrevented || document.activeElement?.closest('[role="menu"]')) return
       if (event.key === 'Escape') { event.stopPropagation(); onClose() }
-      if (event.key === 'Tab') { event.preventDefault(); closeRef.current?.focus() }
+      if (event.key === 'Tab') { event.preventDefault(); imageRef.current?.focus() }
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => {
@@ -61,10 +60,7 @@ export function ImageLightbox({ src, alt, labels, onClose, contextMenuProps }: {
     >
       <div className={css.stage}>
         <div className={css.mask} aria-hidden="true" onMouseDown={onClose} />
-        <img className={css.image} src={src} alt={alt} {...contextMenuProps} />
-        <button ref={closeRef} type="button" className={css.close} aria-label={labels.close} onClick={onClose}>
-          <IconCloseOutlineRegular size={16} />
-        </button>
+        <img ref={imageRef} className={css.image} src={src} alt={alt} {...contextMenuProps} tabIndex={-1} onClick={onClose} />
       </div>
     </div>,
     document.body,

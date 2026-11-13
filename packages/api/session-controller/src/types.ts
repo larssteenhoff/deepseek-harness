@@ -94,6 +94,13 @@ export interface ModelSelection {
   readonly reasoningEffort?: string
 }
 
+/** Weekly subscription quota exposed by the official Codex account endpoint. */
+export interface CodexWeeklyQuota {
+  readonly remainingPercent: number
+  /** Unix timestamp in seconds, when supplied by Codex. */
+  readonly resetsAt: number | null
+}
+
 /** One adapter-owned reasoning effort for an exact model route. */
 export interface ModelReasoningEffort {
   readonly id: string

@@ -2,6 +2,12 @@
 # production telemetry row at its mock collector through the public env vars.
 - id: session-telemetry-otel
   disabled: false
+  config:
+    # This fixture deliberately opts in and routes only to its local mock
+    # collector. Production profiles have no default telemetry destination.
+    mode: !!js process.env.DSH_TELEMETRY_MODE
+    exporter:
+      url: !!js process.env.DSH_TELEMETRY_OTLP_URL
 
 - id: headless-startup
   disabled: true

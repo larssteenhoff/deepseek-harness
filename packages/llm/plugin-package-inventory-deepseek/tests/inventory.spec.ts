@@ -61,22 +61,22 @@ async function harness(
 }
 
 describe('DeepSeek plugin package inventory', () => {
-  it('contributes by default and can be explicitly disabled', async () => {
+  it('omits the inventory by default and supports explicit opt-in', async () => {
     const defaultHarness = await harness()
     const defaultFields = await defaultHarness.ctx.deepseekLlmApiExtensions.prepare({
       body: { messages: [] }, signal: SIGNAL,
     })
-    expect(defaultFields.fields).toHaveProperty('dsh_plugin_packages')
+    expect(defaultFields.fields).not.toHaveProperty('dsh_plugin_packages')
 
-    const disabledHarness = await harness(false)
-    const disabledFields = await disabledHarness.ctx.deepseekLlmApiExtensions.prepare({
+    const enabledHarness = await harness(true)
+    const enabledFields = await enabledHarness.ctx.deepseekLlmApiExtensions.prepare({
       body: { messages: [] }, signal: SIGNAL,
     })
-    expect(disabledFields.fields).not.toHaveProperty('dsh_plugin_packages')
+    expect(enabledFields.fields).toHaveProperty('dsh_plugin_packages')
   })
 
   it('reports active package versions once, retains parallel versions, and excludes inactive or loose entries', async () => {
-    const { ctx, root } = await harness()
+    const { ctx, root } = await harness(true)
     const oneA = await packagePlugin(root, 'one-a', { name: 'one', version: '1.0.0' })
     const oneB = await packagePlugin(root, 'one-b', { name: 'one', version: '2.0.0' })
     const disabled = await packagePlugin(root, 'disabled', { name: 'disabled', version: '1.0.0' })
@@ -100,7 +100,7 @@ describe('DeepSeek plugin package inventory', () => {
   })
 
   it.each([false, true])('deduplicates name-only identities separately from versioned identities (reversed=%s)', async (reversed) => {
-    const { ctx, root } = await harness()
+    const { ctx, root } = await harness(true)
     const versioned = await packagePlugin(root, 'versioned', { name: 'same', version: 'undefined' })
     const unversioned = await packagePlugin(root, 'unversioned', { name: 'same' })
     const entries = reversed ? [unversioned, versioned] : [versioned, unversioned]
@@ -118,7 +118,7 @@ describe('DeepSeek plugin package inventory', () => {
   })
 
   it.each(['invalid JSON', 'null', 'deleted'])('retains readable packages and warns at most once when another manifest is %s', async (kind) => {
-    const { ctx, root } = await harness()
+    const { ctx, root } = await harness(true)
     const warnings: unknown[][] = []
     ctx.logger.exporter({ levels: { default: LoggerLevel.WARN }, export: (message) => { if (message.type === 'warn') warnings.push(message.args) } })
     const bad = await packagePlugin(root, 'bad', { name: 'bad', version: '1.0.0' })
@@ -139,7 +139,7 @@ describe('DeepSeek plugin package inventory', () => {
   })
 
   it('omits a loose ESM module whose nearest manifest only marks the module type', async () => {
-    const { ctx, root } = await harness()
+    const { ctx, root } = await harness(true)
     const marker = await packagePlugin(root, 'marker-only', {})
     await ctx.loader.create({ name: marker })
     await expect(ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL }))
@@ -147,7 +147,7 @@ describe('DeepSeek plugin package inventory', () => {
   })
 
   it.each(['file', 'bare'])('reports an unversioned private %s package by name alongside versioned packages', async (kind) => {
-    const { ctx, root } = await harness(undefined, true)
+    const { ctx, root } = await harness(true, true)
     const parent = await packagePlugin(root, 'node_modules/inspector', { name: 'inspector', version: '1.0.0' })
     const nested = await packagePlugin(root, kind === 'file' ? 'node_modules/inspector/skill' : 'node_modules/inspector-skill',
       { name: 'inspector-skill', private: true })
@@ -171,7 +171,7 @@ describe('DeepSeek plugin package inventory', () => {
 
   it.each([true, false, undefined].flatMap(isPrivate => [undefined, '', '  ', null, 1, false, {}, []]
     .map(version => ({ name: 'optional-metadata', private: isPrivate, version }))))('omits unavailable version metadata %j', async (manifest) => {
-    const { ctx, root } = await harness()
+    const { ctx, root } = await harness(true)
     const plugin = await packagePlugin(root, 'invalid', manifest)
     await ctx.loader.create({ name: plugin })
     const prepared = await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL })
@@ -179,7 +179,7 @@ describe('DeepSeek plugin package inventory', () => {
   })
 
   it.each([undefined, '', '  ', 1])('omits unavailable package name %j', async (name) => {
-    const { ctx, root } = await harness()
+    const { ctx, root } = await harness(true)
     const plugin = await packagePlugin(root, 'invalid', { name, version: '1.0.0' })
     await ctx.loader.create({ name: plugin })
     await expect(ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL }))
@@ -187,7 +187,7 @@ describe('DeepSeek plugin package inventory', () => {
   })
 
   it('uses the host inventory when a request has no matching or joined live agent', async () => {
-    const { ctx, root } = await harness()
+    const { ctx, root } = await harness(true)
     const plugin = await packagePlugin(root, 'host-only', { name: 'host-only', version: '3.0.0' })
     await ctx.loader.create({ name: plugin })
     const missing = await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL, sessionId: 'missing' })
@@ -201,7 +201,7 @@ describe('DeepSeek plugin package inventory', () => {
   })
 
   it('resolves scoped and unscoped bare subpaths, absolute/file modules, and skips URL or Cordis modules', async () => {
-    const { ctx, root } = await harness(undefined, true)
+    const { ctx, root } = await harness(true, true)
     await packagePlugin(root, 'node_modules/plain-package', { name: 'plain-package', version: '1.0.0' })
     await packagePlugin(root, 'node_modules/@scope/scoped-package', { name: '@scope/scoped-package', version: '2.0.0' })
     await packagePlugin(root, 'absolute-package', { name: 'absolute-package', version: '3.0.0' })
@@ -235,7 +235,7 @@ describe('DeepSeek plugin package inventory', () => {
   })
 
   it('omits a Loader-resolved bare entry with no package manifest', async () => {
-    const { ctx } = await harness()
+    const { ctx } = await harness(true)
     ctx.loader.internal = {
       version: 'v2',
       import: async () => ({ default: () => {} }),
@@ -246,7 +246,7 @@ describe('DeepSeek plugin package inventory', () => {
   })
 
   it('does not bypass the profile package service for a missing bare package', async () => {
-    const { ctx } = await harness(undefined, true)
+    const { ctx } = await harness(true, true)
     ctx.loader.internal = {
       version: 'v2',
       import: async () => ({ default: () => {} }),
@@ -264,7 +264,7 @@ describe('DeepSeek plugin package inventory', () => {
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(DeepSeekLlmApiExtensionRegistry)
-    await ctx.plugin(PluginInventory)
+    await ctx.plugin(PluginInventory, { enabled: true })
     ctx.loader.builtins.noop = () => {}
     await ctx.loader.create({ name: 'cordis:noop' })
     const prepared = await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL })
@@ -272,7 +272,7 @@ describe('DeepSeek plugin package inventory', () => {
   })
 
   it('uses each ordinary Loader tree base for conflicting bare package versions', async () => {
-    const { ctx, root } = await harness()
+    const { ctx, root } = await harness(true)
     await packagePlugin(root, 'node_modules/versioned-plugin', {
       name: 'versioned-plugin', version: '1.0.0',
     })
@@ -295,7 +295,7 @@ describe('DeepSeek plugin package inventory', () => {
   })
 
   it('resolves preset plugins from the host and nested composition bases', async () => {
-    const { ctx, root } = await harness()
+    const { ctx, root } = await harness(true)
     await packagePlugin(root, 'node_modules/preset-only', { name: 'preset-only', version: '4.0.0' })
     const nestedRoot = join(root, 'nested-preset')
     await packagePlugin(nestedRoot, 'node_modules/preset-only', { name: 'preset-only', version: '5.0.0' })
@@ -326,7 +326,7 @@ describe('DeepSeek plugin package inventory', () => {
   })
 
   it('withdraws the inventory field when the contributing plugin reloads', async () => {
-    const { ctx, disposeInventory } = await harness()
+    const { ctx, disposeInventory } = await harness(true)
     expect((await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL })).fields)
       .toHaveProperty('dsh_plugin_packages')
     await disposeInventory()

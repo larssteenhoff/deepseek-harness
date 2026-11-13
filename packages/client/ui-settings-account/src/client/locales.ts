@@ -15,6 +15,7 @@ export const en = {
   platformFailed: 'Could not complete the operation. Try again.', platformRetry: 'Retry',
   loading: 'Loading…', backToHarness: 'Back to DeepSeek Harness',
   settings: 'Settings', contactUs: 'Feedback', menu: 'Account menu',
+  openaiWeeklyUsage: 'ChatGPT / Codex', remainingThisWeek: 'left this week',
   nav: 'Account', signedIn: 'Signed in to DeepSeek', signedOut: 'Not signed in',
   signIn: 'Sign in', signOut: 'Sign out',
   signOutUnknownDescription: 'Could not check running tasks. Signing out may interrupt tasks using this account. Sign out now?',
@@ -50,6 +51,7 @@ export const zh: Record<AccountKey, string> = {
   platformFailed: '操作未完成，请重试', platformRetry: '重试',
   loading: '加载中…', backToHarness: '返回 DeepSeek Harness',
   settings: '设置', contactUs: '意见反馈', menu: '账号菜单',
+  openaiWeeklyUsage: 'ChatGPT / Codex', remainingThisWeek: '本周剩余',
   nav: '账号与余额', signedIn: '已登录 DeepSeek', signedOut: '尚未登录',
   signIn: '登录', signOut: '退出登录',
   signOutUnknownDescription: '暂时无法确认任务状态。退出登录可能会中断使用此账号的任务，是否继续？',
@@ -72,6 +74,7 @@ export const zh: Record<AccountKey, string> = {
 
 /** Japanese copy, checked against the English keys. */
 export const ja = {
+  openaiWeeklyUsage: 'ChatGPT / Codex', remainingThisWeek: '今週の残り',
   ...onboardingJa,
   'modelSignInRequired': 'モデルを利用できません。ログインしてから再試行してください。',
   'sessionExpired': 'アカウントからログアウトしました。もう一度ログインしてください。',
@@ -131,6 +134,7 @@ export const ja = {
 
 /** Spanish dictionary, checked against the English keys. */
 export const es = {
+  openaiWeeklyUsage: 'ChatGPT / Codex', remainingThisWeek: 'restante esta semana',
   modelSignInRequired: 'Modelo no disponible. Por favor inicia sesión y vuelve a intentarlo.',
   sessionExpired: 'Has cerrado sesión en tu cuenta, inicia sesión nuevamente.',
   ...onboardingEs,
@@ -165,6 +169,7 @@ export const es = {
 
 /** French dictionary, checked against the English keys. */
 export const fr = {
+  openaiWeeklyUsage: 'ChatGPT / Codex', remainingThisWeek: 'restant cette semaine',
   modelSignInRequired: 'Modèle indisponible. Veuillez vous connecter et réessayer.',
   sessionExpired: 'Vous vous êtes déconnecté de votre compte, veuillez vous reconnecter.',
   ...onboardingFr,
@@ -199,6 +204,7 @@ export const fr = {
 
 /** German dictionary, checked against the English keys. */
 export const de = {
+  openaiWeeklyUsage: 'ChatGPT / Codex', remainingThisWeek: 'diese Woche übrig',
   modelSignInRequired: 'Modell nicht verfügbar. Bitte melden Sie sich an und versuchen Sie es erneut.',
   sessionExpired: 'Sie haben sich von Ihrem Konto abgemeldet. Bitte melden Sie sich erneut an.',
   ...onboardingDe,
@@ -233,6 +239,7 @@ export const de = {
 
 /** Russian dictionary, checked against the English keys. */
 export const ru = {
+  openaiWeeklyUsage: 'ChatGPT / Codex', remainingThisWeek: 'осталось на этой неделе',
   modelSignInRequired: 'Модель недоступна. Пожалуйста, войдите в систему и повторите попытку.',
   sessionExpired: 'Вы вышли из своей учетной записи, пожалуйста, войдите снова.',
   ...onboardingRu,
@@ -267,6 +274,7 @@ export const ru = {
 
 /** Portuguese dictionary, checked against the English keys. */
 export const pt = {
+  openaiWeeklyUsage: 'ChatGPT / Codex', remainingThisWeek: 'restante nesta semana',
   modelSignInRequired: 'Modelo indisponível. Faça login e tente novamente.',
   sessionExpired: 'Você saiu da sua conta, faça login novamente.',
   ...onboardingPt,

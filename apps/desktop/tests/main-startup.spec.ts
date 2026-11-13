@@ -852,7 +852,7 @@ describe('desktop main startup', () => {
     expect(refreshed.filter(item => item.role === 'toggleDevTools' && item.visible !== false)).toEqual([
       { role: 'toggleDevTools', label: nextLocale === 'en' ? en.toggleDevToolsMenu : zh.toggleDevToolsMenu },
     ])
-    expect(harness.windows[0]!.options).toMatchObject({ webPreferences: { devTools: true } })
+    expect(harness.windows[0]!.options).toMatchObject({ webPreferences: { devTools: true, minimumFontSize: 12 } })
   })
 
   it.each([
@@ -1155,7 +1155,8 @@ describe('desktop main startup', () => {
     const window = harness.windows[0]!
     expect(window.urls).toEqual(['dsh-app://app/'])
     if (platform === 'darwin') {
-      expect(window.options).toMatchObject({ titleBarStyle: 'hiddenInset', vibrancy: 'sidebar', backgroundColor: '#00000000' })
+      expect(window.options).toMatchObject({ titleBarStyle: 'default', backgroundColor: '#f9fafb' })
+      expect(window.options).not.toHaveProperty('vibrancy')
     } else if (platform === 'win32') {
       expect(window.options).toMatchObject({ titleBarStyle: 'hidden', titleBarOverlay: { height: WINDOWS_TITLEBAR_HEIGHT } })
       expect(window.options).not.toHaveProperty('vibrancy')
@@ -1196,8 +1197,7 @@ describe('desktop main startup', () => {
       host.fetch.mockResolvedValue(Response.json({ hasApiKey: true, localePreference: null, themePreference: source }))
       window.show.mockImplementation(() => {
         expect(harness.nativeTheme.themeSource).toBe(source)
-        if (platform === 'win32') expect(window.setBackgroundColor).toHaveBeenLastCalledWith(color)
-        else expect(window.options).toMatchObject({ backgroundColor: '#00000000', vibrancy: 'sidebar' })
+        expect(window.setBackgroundColor).toHaveBeenLastCalledWith(color)
       })
       host.ready.resolve()
       await Promise.resolve(invoke(DESKTOP_IPC.boot))
@@ -1280,35 +1280,24 @@ describe('desktop main startup', () => {
     expect(window.webContents.send.mock.calls.filter(([channel]) => channel === DESKTOP_IPC.windowFullscreen)).toHaveLength(0)
   })
 
-  it('covers the macOS vibrancy reattach gap with an opaque base while minimized or hidden', async () => {
+  it('keeps macOS on the native titlebar without renderer backdrop swaps', async () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
     await import('../src/main.ts')
     await harness.preparing.promise
     const window = harness.windows[0]!
-    // Minimizing drops the vibrancy material and paints the theme's opaque fill.
     window.minimized = true
     window.emit('minimize')
-    expect(window.setVibrancy).toHaveBeenLastCalledWith(null)
-    expect(window.setBackgroundColor).toHaveBeenLastCalledWith('#f9fafb')
-    // Restoring re-requests the material and returns to the transparent base.
     window.minimized = false
     window.emit('restore')
-    expect(window.setVibrancy).toHaveBeenLastCalledWith('sidebar')
-    expect(window.setBackgroundColor).toHaveBeenLastCalledWith('#00000000')
-    // Hiding under the dark palette picks the dark opaque fill.
     harness.nativeTheme.shouldUseDarkColors = true
     window.visible = false
     window.emit('hide')
-    expect(window.setVibrancy).toHaveBeenLastCalledWith(null)
-    expect(window.setBackgroundColor).toHaveBeenLastCalledWith('#1b1b1c')
     window.visible = true
     window.emit('show')
-    expect(window.setBackgroundColor).toHaveBeenLastCalledWith('#00000000')
-    // A destroyed window ends the backdrop updates.
-    const applied = window.setVibrancy.mock.calls.length
     window.destroyed = true
     window.emit('minimize')
-    expect(window.setVibrancy.mock.calls).toHaveLength(applied)
+    expect(window.setVibrancy).not.toHaveBeenCalled()
+    expect(window.setBackgroundColor).not.toHaveBeenCalled()
   })
 
   it.each(['win32', 'linux'] as const)('registers no backdrop swap on %s', async (platform) => {

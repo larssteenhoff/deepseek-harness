@@ -16,13 +16,13 @@
 body {
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l1);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l1);
-  --dsh-scrollbar-thumb-border: 0px;
+  --dsh-scrollbar-thumb-border: 2px;
   --dsh-scrollbar-track-margin: 0px;
   /* The WebKit bar's layout width, mirrored by the ::-webkit-scrollbar rule
-     below. A surface that must align itself beside a space-consuming bar
-     (ConversationRoot's overlay composer seat) reads this instead of
-     hardcoding the number. */
-  --dsh-scrollbar-width: 5px;
+     below. This includes the 2px transparent thumb inset on both sides, so
+     the visible 10px thumb retains its previous size. A surface that must
+     align itself beside the bar reads this instead of hardcoding the number. */
+  --dsh-scrollbar-width: 14px;
 }
 
 /* The two paths are mutually exclusive, and the gate is load-bearing rather
@@ -55,7 +55,7 @@ body {
      thumb colour and the engine derives its own hover treatment. */
   body,
   body * {
-    scrollbar-width: thin;
+    scrollbar-width: auto;
     scrollbar-color: var(--dsh-scrollbar-thumb) transparent;
   }
 }

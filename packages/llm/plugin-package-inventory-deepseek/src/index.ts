@@ -30,13 +30,13 @@ export const inject = ['agents', 'deepseekLlmApiExtensions', 'loader']
 
 /** Plugin-package request contribution configuration. */
 export interface Config {
-  /** Contribute `dsh_plugin_packages` to official DeepSeek requests. Defaults to `true`. */
+  /** Contribute `dsh_plugin_packages` to official DeepSeek requests. Defaults to `false`. */
   enabled?: boolean
 }
 
 /** Validated plugin-package request contribution configuration. */
 export const Config: z<Config> = z.object({
-  enabled: z.boolean().default(true),
+  enabled: z.boolean().default(false),
 })
 
 interface PackageManifest {

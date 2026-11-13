@@ -1,5 +1,9 @@
 /** Electron shell: desktop project ownership, custom protocol, windows, and lifecycle. */
 
+import { APP_MINIMUM_FONT_SIZE } from './typography.ts'
+import { QwenServer } from './qwen-server.ts'
+import { GpuMemoryLimit, gpuLimitTarget } from './gpu-memory-limit.ts'
+import { totalmem, userInfo } from 'node:os'
 import { installFileActions } from './file-actions.ts'
 import { configurationFailure, channelSaveFailure, configurationMessage } from './update-configuration.ts'
 import type { DesktopChannelState, DesktopChannelChangeResult } from '@deepseek-ai/dsh-client-ui-settings-general/types'
@@ -274,16 +278,11 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
       titleBarOverlay: { height: WINDOWS_TITLEBAR_HEIGHT, color: chromeFallbackFill(),
         symbolColor: nativeTheme.shouldUseDarkColors ? '#f9fafb' : '#0f1115' },
     } : {}),
-    // hiddenInset places traffic lights inside the sidebar; sidebar vibrancy
-    // needs a transparent window background to show through the page.
+    // Use the native macOS title bar so traffic lights, title, and window
+    // controls stay in the standard system chrome instead of a renderer strip.
     ...(process.platform === 'darwin' ? {
-      titleBarStyle: 'hiddenInset' as const,
-      trafficLightPosition: { x: 16, y: 18 },
-      vibrancy: 'sidebar' as const,
-      // 'active' keeps the vibrancy material stable when the window blurs;
-      // 'followWindow' washes the sidebar out behind an unfocused window.
-      visualEffectState: 'active' as const,
-      backgroundColor: '#00000000',
+      titleBarStyle: 'default' as const,
+      backgroundColor: chromeFallbackFill(),
     } : {}),
     webPreferences: {
       preload,
@@ -293,6 +292,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
       webSecurity: true,
       webviewTag: primary,
       devTools: true,
+      minimumFontSize: APP_MINIMUM_FONT_SIZE,
     },
   })
   window.webContents.setWindowOpenHandler(({ url }) => {
@@ -310,35 +310,14 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
     // current state so a fullscreen reload does not fall back to windowed CSS.
     window.webContents.on('did-finish-load', sendFullscreen)
   }
-  if (process.platform === 'win32' && primary) {
+  if ((process.platform === 'win32' || process.platform === 'darwin') && primary) {
     const updateBackground = (): void => {
       if (!window.isDestroyed()) window.setBackgroundColor(chromeFallbackFill())
     }
     nativeTheme.on('updated', updateBackground)
     window.once('closed', () => { nativeTheme.removeListener('updated', updateBackground) })
   }
-  if (process.platform === 'darwin') {
-    // Deminiaturize reattaches the NSVisualEffectView material late
-    // (electron/electron#25368), so a transparent window shows the desktop
-    // through the sidebar until then. Paint an opaque base while minimized or
-    // hidden so the deminiaturize animation and the reattachment gap show a
-    // solid fill; restoring flips back, and the null -> 'sidebar' transition
-    // forces the material to reattach.
-    const applyBackdrop = (): void => {
-      if (window.isDestroyed()) return
-      if (window.isMinimized() || !window.isVisible()) {
-        window.setVibrancy(null)
-        window.setBackgroundColor(chromeFallbackFill())
-      } else {
-        window.setVibrancy('sidebar')
-        window.setBackgroundColor('#00000000')
-      }
-    }
-    window.on('minimize', applyBackdrop)
-    window.on('hide', applyBackdrop)
-    window.on('restore', applyBackdrop)
-    window.on('show', applyBackdrop)
-  }
+
   window.webContents.on('context-menu', (_event, { isEditable, selectionText, editFlags }) => {
     const items: MenuItemConstructorOptions[] = []
     if (isEditable) {
@@ -746,6 +725,7 @@ async function main(): Promise<void> {
         if (stopFailure !== undefined) throw new DesktopUpdatePreparationError('stop-failed', locale.messages.updateStopFailed, stopFailure.message)
         await operationJournal?.drain(500)
         updateJournal?.action('install-confirmed')
+        await qwenServer.close()
         shellInstallerOwnsQuit = true
       } catch (error) {
         operationReportsStopping = shuttingDown
@@ -877,6 +857,21 @@ async function main(): Promise<void> {
     platformView.setBounds(platformBounds(bounds))
   })
   ipcMain.handle(PLATFORM_IPC.close, (event) => { assertMainApplication(event); platformView.close() })
+  const qwenServer = new QwenServer(join(app.getPath('userData'), 'qwen-server.json'), () => loginShell,
+    new GpuMemoryLimit(gpuLimitTarget(totalmem()), userInfo().username))
+  const qwenReady = qwenServer.initialize().catch((error: unknown) => { console.error('Qwen initialization failed', error) })
+  ipcMain.handle(DESKTOP_IPC.qwenStatus, async (event) => { assertMainApplication(event); await qwenReady; return qwenServer.status() })
+  ipcMain.handle(DESKTOP_IPC.qwenStart, async (event) => { assertMainApplication(event); await qwenReady; return qwenServer.start() })
+  ipcMain.handle(DESKTOP_IPC.qwenStop, async (event) => { assertMainApplication(event); await qwenReady; return qwenServer.stop() })
+  ipcMain.handle(DESKTOP_IPC.qwenConfigure, async (event, value: unknown) => {
+    assertMainApplication(event)
+    if (typeof value !== 'object' || value === null || !('autoStart' in value) || !('stopOnExit' in value)
+      || !('raiseGpuLimit' in value) || typeof value.autoStart !== 'boolean' || typeof value.stopOnExit !== 'boolean'
+      || typeof value.raiseGpuLimit !== 'boolean') throw new Error('Invalid Qwen preferences')
+    await qwenReady
+    return qwenServer.configure({ autoStart: value.autoStart, stopOnExit: value.stopOnExit, raiseGpuLimit: value.raiseGpuLimit })
+  })
+
   // Only the main window may synchronize its palette with the native material.
   ipcMain.on(DESKTOP_IPC.nativeThemeSet, (event, source: unknown) => {
     if (mainWindow === undefined || event.sender !== mainWindow.webContents
@@ -1457,17 +1452,16 @@ async function main(): Promise<void> {
     const state = await readWelcomeState()
     if (isQuitting() || backend.state.phase !== 'ready') return
     nativeTheme.themeSource = state.themePreference
+    if (process.platform === 'darwin' && mainWindow !== undefined && !mainWindow.isDestroyed()) {
+      mainWindow.setBackgroundColor(chromeFallbackFill())
+    }
     locale = resolveDesktopStartupLocale(state.localePreference, systemLanguages)
     writeDesktopLocaleCache(app.getPath('userData'), locale.id)
     windowsLanguage = locale.id
     refreshApplicationMenu()
-    if (!enteredWorkspace && needsWelcome({ loggedIn: state.loggedIn, hasApiKey: state.hasApiKey })) {
-      // A later login must retain its own activation policy instead of replaying startup focus.
-      raiseAfterUpdate = false
-      await showWelcome()
-    } else {
-      await enterWorkspace()
-    }
+    // Always open the workspace on launch. Authentication can be configured from inside the
+    // app; the standalone welcome screen should not block a fresh or signed-out session.
+    await enterWorkspace()
   }
   focusPrimaryWindow = () => {
     if (quitting) return
@@ -1511,7 +1505,8 @@ async function main(): Promise<void> {
     updateSchedule.dispose()
     updateDialog.dispose()
     mandatoryUI?.dispose()
-    void Promise.all([stopOperationReports(), Promise.resolve(mandatoryPolicy?.dispose()).then(() => policyAuth?.dispose()),
+    void Promise.all([qwenServer.close(), stopOperationReports(),
+      Promise.resolve(mandatoryPolicy?.dispose()).then(() => policyAuth?.dispose()),
       backend.close().then(async () => { await operationJournal?.drain(500) }, async (error: unknown) => {
         await operationJournal?.drain(500)
         throw error

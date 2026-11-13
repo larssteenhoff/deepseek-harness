@@ -68,12 +68,13 @@ function dimensionsOf(image: MessageImageSpec): { readonly width: number; readon
  * @param props.labels - resolved strings (tooltip, loading, retry, lightbox).
  * @returns the bounded thumbnail button, or the retry control on failure.
  */
-export function MessageImage({ image, load, variant, labels, fileDrag, getTriggerProps }: {
+export function MessageImage({ image, load, variant, labels, fileDrag, getTriggerProps, showResolution = false }: {
   image: MessageImageSpec
   load: ImageLoader
   variant: 'single' | 'tile' | 'thumbnail'
   fileDrag: FileDragActions
   labels: MessageImageLabels
+  showResolution?: boolean
   getTriggerProps: ContextMenuBindings['getTriggerProps']
 }) {
   const preview = 'preview' in image ? image.preview : undefined
@@ -132,26 +133,32 @@ export function MessageImage({ image, load, variant, labels, fileDrag, getTrigge
   )
   return (
     <>
-      <button
-        type="button"
-        className={css.frame}
-        data-variant={variant}
-        style={fit === undefined ? undefined : { width: fit.width, height: fit.height }}
-        title={loadingThumbnail ? labels.loading : labels.open}
-        aria-label={loadingThumbnail ? labels.loading : labels.openNamed(label)}
-        aria-busy={loadingThumbnail || undefined}
-        {...contextMenuProps}
-        onClick={() => { if (src !== null) setOpen(true) }}
-      >
-        {src === null
-          ? (
-            <span className={css.loading} aria-hidden={loadingThumbnail || undefined}>
-              {loadingThumbnail ? <IconLoadingOutlineRegular className={css.spinner} /> : labels.loading}
-            </span>
-          )
-          : <DraggableImage fileDrag={fileDrag} src={src} alt={label} name={preview?.name ?? attachment?.name ?? 'image'}
-            style={fit === undefined ? undefined : { objectPosition: fit.objectPosition }} />}
-      </button>
+      <div className={css.item}>
+        <button
+          type="button"
+          className={css.frame}
+          data-variant={variant}
+          style={fit === undefined ? undefined : { width: fit.width, height: fit.height }}
+          title={loadingThumbnail ? labels.loading : labels.open}
+          aria-label={loadingThumbnail ? labels.loading : labels.openNamed(label)}
+          aria-busy={loadingThumbnail || undefined}
+          {...contextMenuProps}
+          onClick={() => { if (src !== null) setOpen(true) }}
+        >
+          {src === null
+            ? (
+              <span className={css.loading} aria-hidden={loadingThumbnail || undefined}>
+                {loadingThumbnail ? <IconLoadingOutlineRegular className={css.spinner} /> : labels.loading}
+              </span>
+            )
+            : <DraggableImage fileDrag={fileDrag} src={src} alt={label} name={preview?.name ?? attachment?.name ?? 'image'} style={fit === undefined ? undefined : { objectPosition: fit.objectPosition }} />}
+        </button>
+        {showResolution && dimensions !== undefined && (
+          <span className={css.resolution}>
+            {dimensions.width} × {dimensions.height} px
+          </span>
+        )}
+      </div>
       {open && src !== null && <ImageLightbox src={src} alt={label} labels={labels.lightbox} onClose={close}
         contextMenuProps={contextMenuProps} />}
     </>
@@ -182,6 +189,7 @@ export function ImageGallery({ images, load, align, compact = false, thumbnail =
           variant={variant}
           fileDrag={fileDrag}
           labels={labels}
+          showResolution={align === 'start' && variant === 'single'}
           getTriggerProps={getTriggerProps}
         />
       ))}

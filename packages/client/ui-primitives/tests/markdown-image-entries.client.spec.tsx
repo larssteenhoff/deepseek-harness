@@ -58,11 +58,24 @@ it('opens inline images in the shared lightbox, restores focus, and never opens 
   fireEvent.click(trigger)
   expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeTruthy()
   fireEvent.keyDown(window, { key: 'Tab' })
-  expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close preview' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Close preview' }))
+  expect(document.activeElement).toBe(screen.getByRole('dialog').querySelector('img'))
+  fireEvent.click(screen.getByRole('dialog').querySelector('img')!)
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(document.activeElement).toBe(trigger)
   expect(openFile).not.toHaveBeenCalled()
+})
+
+it('shows the loaded image resolution in a pill beneath the generated image', () => {
+  mount('![Generated](image.png)')
+  const image = screen.getByRole('img')
+  Object.defineProperties(image, {
+    naturalWidth: { configurable: true, value: 1536 },
+    naturalHeight: { configurable: true, value: 1024 },
+  })
+  fireEvent.load(image)
+  const resolution = screen.getByText('1536 × 1024 px')
+  expect(resolution.parentElement?.tagName).toBe('SPAN')
+  expect(resolution.previousElementSibling?.tagName).toBe('BUTTON')
 })
 
 it.each([
