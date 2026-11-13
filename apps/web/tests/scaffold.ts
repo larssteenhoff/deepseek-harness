@@ -422,11 +422,11 @@ export interface LaunchOptions {
     definitions?: import('@deepseek-ai/dsh-agent-preset-registry').PresetDefinition[]
   }
   /**
-   * Patch the telemetry exporter URL while preserving the shipped enabled
-   * setting. A scenario-owned loopback collector contains all fixture uploads.
+   * Patch the telemetry exporter URL and explicitly opt in for this scenario.
+   * A scenario-owned loopback collector contains all fixture uploads.
    */
   telemetryUrl?: string
-  /** Mode when telemetryUrl is supplied; defaults to FEEDBACK_ONLY without enabling a disabled row. */
+  /** Mode when telemetryUrl is supplied; defaults to FEEDBACK_ONLY and opts in for this fixture. */
   telemetryMode?: 'FEEDBACK_ONLY'
   /** SDK batch cadence for a scenario-owned collector; omitted to retain the SDK default. */
   telemetryScheduledDelayMillis?: number
@@ -626,11 +626,12 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     // Fixture sessions must never leave the process: the shipped row defaults
     // to the production OTLP endpoint (or whatever DSH_TELEMETRY_OTLP_URL
     // names in the ambient environment). A scenario with a local collector
-    // preserves the shipped disabled setting instead of overriding it.
+    // explicitly opts in while keeping every fixture upload on loopback.
     options.telemetryUrl === undefined
       ? { id: 'session-telemetry-otel', disabled: true }
       : {
         id: 'session-telemetry-otel',
+        disabled: false,
         config: {
           mode: options.telemetryMode ?? 'FEEDBACK_ONLY',
           exporter: { url: options.telemetryUrl },

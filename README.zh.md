@@ -14,6 +14,10 @@ DeepSeek Harness 处于 _开发者预览_ 阶段，正在快速迭代。**未来
 
 运行本项目前，请阅读[安全说明](SAFETY.zh.md)。
 
+## 截图
+
+<p align="center"><img src="docs/user/guide/harness-image-generation.png" alt="DeepSeek Harness 展示生成的蘑菇森林图片及其分辨率" width="100%"></p>
+
 <a id="run"></a>
 
 ## 运行

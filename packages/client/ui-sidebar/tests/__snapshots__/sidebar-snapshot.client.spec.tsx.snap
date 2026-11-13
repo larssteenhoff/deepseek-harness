@@ -10,8 +10,7 @@ exports[`sidebar shell snapshots > renders Windows caption controls in expanded 
     style=""
   >
     <div
-      class="logoRow"
-      data-window-drag="true"
+      class="windowToggle"
     >
       <button
         aria-label="Open sidebar"
@@ -34,6 +33,10 @@ exports[`sidebar shell snapshots > renders Windows caption controls in expanded 
       </button>
     </div>
     <div
+      class="logoRow"
+      data-window-drag="true"
+    />
+    <div
       class="newSessionRow"
     >
       <div
@@ -53,8 +56,8 @@ exports[`sidebar shell snapshots > renders Windows caption controls in expanded 
             >
               <svg
                 aria-hidden="true"
-                data-content="6e5e38f3"
-                data-icon="dsw-icon-new-chat-outline-regular"
+                data-content="ebc5d6eb"
+                data-icon="dsw-icon-plus-outline-medium"
                 height="16"
                 width="16"
               />
@@ -95,12 +98,16 @@ exports[`sidebar shell snapshots > renders Windows caption controls in expanded 
         />
       </div>
       <div
-        class="settingsArea"
+        class="settingsRow"
       >
         <div
-          data-slot="sidebar.settings"
-          style="display: contents;"
-        />
+          class="settingsArea"
+        >
+          <div
+            data-slot="sidebar.settings"
+            style="display: contents;"
+          />
+        </div>
       </div>
     </div>
   </div>
@@ -177,21 +184,6 @@ exports[`sidebar shell snapshots > renders Windows caption controls in expanded 
           </span>
         </span>
       </button>
-      <button
-        aria-label="Collapse sidebar"
-        class="iconButton toggle"
-        data-sidebar-toggle="true"
-        type="button"
-      >
-        <svg
-          aria-hidden="true"
-          class="panelIcon"
-          data-content="d95b7908"
-          data-icon="dsw-icon-panel-left-outline-regular"
-          height="16"
-          width="16"
-        />
-      </button>
     </div>
     <div
       class="newSessionRow"
@@ -213,10 +205,10 @@ exports[`sidebar shell snapshots > renders Windows caption controls in expanded 
             >
               <svg
                 aria-hidden="true"
-                data-content="532cf99a"
-                data-icon="dsw-icon-new-chat-outline-medium"
-                height="14"
-                width="14"
+                data-content="ebc5d6eb"
+                data-icon="dsw-icon-plus-outline-medium"
+                height="16"
+                width="16"
               />
               <span
                 class="newSessionLabel wide"
@@ -261,12 +253,31 @@ exports[`sidebar shell snapshots > renders Windows caption controls in expanded 
         />
       </div>
       <div
-        class="settingsArea"
+        class="settingsRow"
       >
         <div
-          data-slot="sidebar.settings"
-          style="display: contents;"
-        />
+          class="settingsArea"
+        >
+          <div
+            data-slot="sidebar.settings"
+            style="display: contents;"
+          />
+        </div>
+        <button
+          aria-label="Collapse sidebar"
+          class="iconButton toggle"
+          data-sidebar-toggle="true"
+          type="button"
+        >
+          <svg
+            aria-hidden="true"
+            class="panelIcon"
+            data-content="d95b7908"
+            data-icon="dsw-icon-panel-left-outline-regular"
+            height="16"
+            width="16"
+          />
+        </button>
       </div>
     </div>
   </div>
@@ -285,45 +296,7 @@ exports[`sidebar shell snapshots > renders the collapsed rail after the crossfad
     <div
       class="logoRow"
       data-window-drag="true"
-    >
-      <button
-        aria-label="Open sidebar"
-        class="iconButton toggle"
-        data-sidebar-toggle="true"
-        type="button"
-      >
-        <span
-          aria-hidden="true"
-          class="railMark"
-        >
-          <div
-            data-slot="sidebar.brand.mark"
-            style="display: contents;"
-          >
-            <svg
-              aria-hidden="true"
-              data-content="965fe321"
-              fill="none"
-              height="17.6580310880829"
-              viewBox="0 0 23.16 17.04"
-              width="24"
-            />
-          </div>
-        </span>
-        <svg
-          aria-hidden="true"
-          class="panelIcon"
-          data-content="d95b7908"
-          data-icon="dsw-icon-panel-left-outline-regular"
-          height="18"
-          width="18"
-        />
-        <div
-          data-slot="sidebar.toggle.badge"
-          style="display: contents;"
-        />
-      </button>
-    </div>
+    />
     <div
       class="newSessionRow"
     >
@@ -344,8 +317,8 @@ exports[`sidebar shell snapshots > renders the collapsed rail after the crossfad
             >
               <svg
                 aria-hidden="true"
-                data-content="6e5e38f3"
-                data-icon="dsw-icon-new-chat-outline-regular"
+                data-content="ebc5d6eb"
+                data-icon="dsw-icon-plus-outline-medium"
                 height="18"
                 width="18"
               />
@@ -386,12 +359,53 @@ exports[`sidebar shell snapshots > renders the collapsed rail after the crossfad
         />
       </div>
       <div
-        class="settingsArea"
+        class="settingsRow"
       >
         <div
-          data-slot="sidebar.settings"
-          style="display: contents;"
-        />
+          class="settingsArea"
+        >
+          <div
+            data-slot="sidebar.settings"
+            style="display: contents;"
+          />
+        </div>
+        <button
+          aria-label="Open sidebar"
+          class="iconButton toggle"
+          data-sidebar-toggle="true"
+          type="button"
+        >
+          <span
+            aria-hidden="true"
+            class="railMark"
+          >
+            <div
+              data-slot="sidebar.brand.mark"
+              style="display: contents;"
+            >
+              <svg
+                aria-hidden="true"
+                data-content="965fe321"
+                fill="none"
+                height="17.6580310880829"
+                viewBox="0 0 23.16 17.04"
+                width="24"
+              />
+            </div>
+          </span>
+          <svg
+            aria-hidden="true"
+            class="panelIcon"
+            data-content="d95b7908"
+            data-icon="dsw-icon-panel-left-outline-regular"
+            height="18"
+            width="18"
+          />
+          <div
+            data-slot="sidebar.toggle.badge"
+            style="display: contents;"
+          />
+        </button>
       </div>
     </div>
   </div>
@@ -468,21 +482,6 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
           </span>
         </span>
       </button>
-      <button
-        aria-label="Collapse sidebar"
-        class="iconButton toggle"
-        data-sidebar-toggle="true"
-        type="button"
-      >
-        <svg
-          aria-hidden="true"
-          class="panelIcon"
-          data-content="d95b7908"
-          data-icon="dsw-icon-panel-left-outline-regular"
-          height="16"
-          width="16"
-        />
-      </button>
     </div>
     <div
       class="newSessionRow"
@@ -504,10 +503,10 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
             >
               <svg
                 aria-hidden="true"
-                data-content="532cf99a"
-                data-icon="dsw-icon-new-chat-outline-medium"
-                height="14"
-                width="14"
+                data-content="ebc5d6eb"
+                data-icon="dsw-icon-plus-outline-medium"
+                height="16"
+                width="16"
               />
               <span
                 class="newSessionLabel wide"
@@ -552,12 +551,31 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
         />
       </div>
       <div
-        class="settingsArea"
+        class="settingsRow"
       >
         <div
-          data-slot="sidebar.settings"
-          style="display: contents;"
-        />
+          class="settingsArea"
+        >
+          <div
+            data-slot="sidebar.settings"
+            style="display: contents;"
+          />
+        </div>
+        <button
+          aria-label="Collapse sidebar"
+          class="iconButton toggle"
+          data-sidebar-toggle="true"
+          type="button"
+        >
+          <svg
+            aria-hidden="true"
+            class="panelIcon"
+            data-content="d95b7908"
+            data-icon="dsw-icon-panel-left-outline-regular"
+            height="16"
+            width="16"
+          />
+        </button>
       </div>
     </div>
   </div>
@@ -634,21 +652,6 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
           </span>
         </span>
       </button>
-      <button
-        aria-label="收起侧边栏"
-        class="iconButton toggle"
-        data-sidebar-toggle="true"
-        type="button"
-      >
-        <svg
-          aria-hidden="true"
-          class="panelIcon"
-          data-content="d95b7908"
-          data-icon="dsw-icon-panel-left-outline-regular"
-          height="16"
-          width="16"
-        />
-      </button>
     </div>
     <div
       class="newSessionRow"
@@ -670,10 +673,10 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
             >
               <svg
                 aria-hidden="true"
-                data-content="532cf99a"
-                data-icon="dsw-icon-new-chat-outline-medium"
-                height="14"
-                width="14"
+                data-content="ebc5d6eb"
+                data-icon="dsw-icon-plus-outline-medium"
+                height="16"
+                width="16"
               />
               <span
                 class="newSessionLabel wide"
@@ -718,12 +721,31 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
         />
       </div>
       <div
-        class="settingsArea"
+        class="settingsRow"
       >
         <div
-          data-slot="sidebar.settings"
-          style="display: contents;"
-        />
+          class="settingsArea"
+        >
+          <div
+            data-slot="sidebar.settings"
+            style="display: contents;"
+          />
+        </div>
+        <button
+          aria-label="收起侧边栏"
+          class="iconButton toggle"
+          data-sidebar-toggle="true"
+          type="button"
+        >
+          <svg
+            aria-hidden="true"
+            class="panelIcon"
+            data-content="d95b7908"
+            data-icon="dsw-icon-panel-left-outline-regular"
+            height="16"
+            width="16"
+          />
+        </button>
       </div>
     </div>
   </div>

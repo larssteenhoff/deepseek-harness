@@ -24,6 +24,7 @@ export const zh = {
   'placeholder.workspace': '选择一个工作区开始',
   'placeholder.steerQueue': 'Cmd/Ctrl+Enter 插话发送全部排队消息',
   'input.commands': '添加文件或调用指令',
+  'input.clear': '清除输入',
   'input.file': '文件',
   'input.stop': '停止生成',
   'input.send': '发送消息',
@@ -430,6 +431,7 @@ export const en = {
   'placeholder.workspace': 'Choose a workspace to start',
   'placeholder.steerQueue': 'Cmd/Ctrl+Enter steers all queued messages',
   'input.commands': 'Add files or run commands',
+  'input.clear': 'Clear prompt',
   'input.file': 'File',
   'input.stop': 'Stop generating',
   'input.send': 'Send message',
@@ -820,6 +822,7 @@ export const en = {
 
 /** Japanese copy, checked against the English keys. */
 export const ja = {
+  'input.clear': 'プロンプトをクリア',
   'quote.remove': '引用を削除',
   'shortcut.newline': '改行',
   'shortcut.complementary': '補助のキュー / 実行中の指示変更を使用',
@@ -1223,6 +1226,7 @@ export const ja = {
 
 /** Spanish dictionary, checked against the English keys. */
 export const es = {
+  'input.clear': 'Borrar mensaje',
   'quote.remove': 'Eliminar cotización',
   'shortcut.newline': 'Nueva linea',
   'shortcut.complementary': 'Usar la acción alternativa de poner en cola o redirigir',
@@ -1628,6 +1632,7 @@ export const es = {
 
 /** French dictionary, checked against the English keys. */
 export const fr = {
+  'input.clear': 'Effacer le message',
   'quote.remove': 'Supprimer le devis',
   'shortcut.newline': 'Nouvelle ligne',
   'shortcut.complementary': 'Utiliser l’action alternative de mise en attente ou de guidage',
@@ -2033,6 +2038,7 @@ export const fr = {
 
 /** German dictionary, checked against the English keys. */
 export const de = {
+  'input.clear': 'Eingabe löschen',
   'quote.remove': 'Zitat entfernen',
   'shortcut.newline': 'Neue Zeile',
   'shortcut.complementary': 'Die alternative Aktion zum Vormerken oder Lenken verwenden',
@@ -2438,6 +2444,7 @@ export const de = {
 
 /** Russian dictionary, checked against the English keys. */
 export const ru = {
+  'input.clear': 'Очистить сообщение',
   'quote.remove': 'Удалить цитату',
   'shortcut.newline': 'Новая линия',
   'shortcut.complementary': 'Использовать альтернативное действие: поставить в очередь или направить',
@@ -2843,6 +2850,7 @@ export const ru = {
 
 /** Portuguese dictionary, checked against the English keys. */
 export const pt = {
+  'input.clear': 'Limpar mensagem',
   'quote.remove': 'Remover cotação',
   'shortcut.newline': 'Nova linha',
   'shortcut.complementary': 'Usar a ação alternativa de enfileirar ou orientar',

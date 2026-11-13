@@ -16,6 +16,12 @@ import type { FileDragHandle } from '@deepseek-ai/dsh-util-file-drag'
 function createProductApi(): DshDesktopProductApi {
   return {
     protocolVersion: 1,
+    qwenServer: {
+      status: () => ipcRenderer.invoke(DESKTOP_IPC.qwenStatus),
+      start: () => ipcRenderer.invoke(DESKTOP_IPC.qwenStart),
+      stop: () => ipcRenderer.invoke(DESKTOP_IPC.qwenStop),
+      configure: preferences => ipcRenderer.invoke(DESKTOP_IPC.qwenConfigure, preferences),
+    },
     fileActions: {
       save: request => ipcRenderer.invoke(DESKTOP_IPC.fileSave, request) as Promise<FileSaveResult>,
       readClipboardImage: url => ipcRenderer.invoke(DESKTOP_IPC.clipboardImageRead, url) as

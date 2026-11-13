@@ -1,0 +1,1 @@
+Qwen AI server (oMLX)Running · 127.0.0.1:8000Stop serverStart when Harness opensStop when Harness exitsRaise GPU memory limit while Harness is openSets the limit to 27852 MB and restores the macOS default when Harness exits. macOS asks for an administrator password once.

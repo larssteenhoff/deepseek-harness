@@ -45,5 +45,6 @@
 }
 
 .switch[aria-checked='true'] .thumb {
+  background: var(--dsw-alias-state-business-primary);
   transform: translateX(16px);
 }

@@ -60,6 +60,9 @@ describe('dsh-sdk-minimal bundle', () => {
       ['sessions', '@deepseek-ai/dsh-session-persistence-jsonl'],
       ['session-checkpoint-policy', '@deepseek-ai/dsh-session-checkpoint-policy'],
     ])
+    for (const id of ['session-log-deepseek', 'plugin-package-inventory-deepseek']) {
+      expect(rows.find(row => row.id === id)).toMatchObject({ disabled: true, config: { enabled: false } })
+    }
     expect(rows.find(row => row.id === 'sdk-app-startup')?.config).toEqual({ profile: 'sdk-minimal' })
     expect(rows.find(row => row.id === 'sdk-jsonrpc-server')).toMatchObject({
       inject: ['sdkAppStartup', 'loader'],

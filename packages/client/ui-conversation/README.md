@@ -236,3 +236,5 @@ Serialization of the empty retry message depends on the adapter. Prefix reuse de
 None.
 
 </details>
+
+Queued-message panels align with the prompt pill, reserving the attachment button and gap on the left.

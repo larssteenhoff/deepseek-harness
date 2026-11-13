@@ -49,7 +49,7 @@
   padding: 0;
 }
 
-:global([data-windows-titlebar]) .toggle {
+:global([data-windows-titlebar]) .windowToggle .toggle {
   position: fixed;
   top: calc((var(--dsh-windows-titlebar-height) - 28px) / 2);
   left: 12px;
@@ -214,8 +214,7 @@
 }
 
 /* The strip's full 52px foot leaves the wordmark too low; the content column
-   tucks 12px back under it, still clear of the toggle (28px control centered
-   in the strip ends at y 40). */
+   tucks 12px back under it. */
 .topStrip + .logoRow {
   margin-top: -12px;
 }
@@ -246,10 +245,32 @@
   overflow: hidden;
 }
 
+/* The native macOS title bar already owns the window chrome. When the local
+   brand is hidden, keep only a compact breathing space above New Session. */
+:global([data-native-titlebar]) .logoRow {
+  height: 24px;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-bottom: 4px;
+}
+
+/* When both brand slots resolve empty (for example, a brand-removal plugin),
+   collapse the now-vacant row along with the brand button so it does not leave
+   a logo-sized blank above New Session. */
+.logoRow:has(.brandMark > [data-slot='sidebar.brand.mark']:empty):has(.brandName > [data-slot='sidebar.brand.name']:empty) {
+  height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.logoRow:has(.brandMark > [data-slot='sidebar.brand.mark']:empty):has(.brandName > [data-slot='sidebar.brand.name']:empty) .brand {
+  display: none;
+}
+
 .collapsed .logoRow {
-  height: 36px;
+  height: 0;
   padding: 0;
-  margin-bottom: 12px;
+  margin-bottom: 0;
   justify-content: flex-start;
   /* The settled rail's 36px toggle is wider than this 35px row; the base row's clip would cut
      the control's right edge, so the rail stops clipping once the slide has settled. */
@@ -375,21 +396,14 @@
   border-radius: var(--dsw-radius-md);
 }
 
-/* Rail logo swap: collapsed, the toggle rests as the whale mark (brand ink,
-   no hover circle) and hovering reveals the panel icon — the expand
-   affordance (figma sidebar-hover flow). Expanded it is a plain panel icon. */
+/* The collapsed rail keeps the open-sidebar control visible at rest so the
+   affordance does not depend on hover. */
 .collapsed .toggle .panelIcon {
-  display: none;
+  display: inline;
 }
 
-@media (hover: hover) {
-  .collapsed .toggle:hover .panelIcon {
-    display: inline;
-  }
-
-  .collapsed .toggle:hover .railMark {
-    display: none;
-  }
+.collapsed .toggle .railMark {
+  display: none;
 }
 
 .railMark {
@@ -807,11 +821,28 @@
   flex-direction: column;
 }
 
+.settingsRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* The panel glyph has a slightly higher optical center than the Settings glyph. */
+.root:not(.collapsed) .settingsRow > .toggle {
+  position: relative;
+  top: 7px;
+}
+
 .settingsArea,
 .footerActions {
   flex: none;
   min-width: 0;
   width: 100%;
+}
+
+.settingsArea {
+  flex: 1;
 }
 
 .footerActions {
@@ -829,6 +860,20 @@
   width: auto;
 }
 
+.collapsed .settingsRow {
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.windowToggle {
+  position: fixed;
+  inset: 0 auto auto 0;
+  z-index: 30;
+  width: 0;
+  height: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   :global([data-animating]:not([data-dragging])) .root,
   .wide,
@@ -841,4 +886,28 @@
     transition: none;
     animation: none;
   }
+}
+
+/* Desktop customization: in the wide sidebar, New Session is a plain row with the
+   panel entries' inset and padding, left-aligned glyph and label, and hover fill; collapsed keeps the rail icon. */
+.root:not(.collapsed) .newSession {
+  justify-content: flex-start;
+  height: auto;
+  min-height: 32px;
+  margin: 0 var(--dsh-sidebar-paint-inset);
+  padding: 5px calc(var(--dsh-sidebar-row-padding) - var(--dsh-sidebar-paint-inset));
+  border: none;
+  background: transparent;
+  font-weight: 400;
+}
+
+@media (hover: hover) {
+  .root:not(.collapsed) .newSession:hover {
+    background-color: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+.root:not(.collapsed) .newSessionContent {
+  justify-content: flex-start;
+  gap: var(--dsh-sidebar-label-gap);
 }

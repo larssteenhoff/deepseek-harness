@@ -930,6 +930,12 @@ resolveAgent(sessionId: SessionId): Promise<ApiSessionAgentResult>
 @Remote('modelCatalog') modelCatalog(): Promise<ModelCatalog>
 
 /**
+ * Read the signed-in OpenAI ChatGPT/Codex subscription's weekly quota.
+ * @returns remaining weekly percent and reset time, or null when the quota is unavailable.
+ */
+@Remote('codexWeeklyQuota') async codexWeeklyQuota(): Promise<CodexWeeklyQuota | null>
+
+/**
  * Report whether this deployment can hand a Session workspace path to a native desktop.
  * @returns true when the matching open operation is available.
  */

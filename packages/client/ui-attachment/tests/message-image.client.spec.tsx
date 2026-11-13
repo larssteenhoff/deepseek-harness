@@ -60,7 +60,7 @@ describe('MessageImage', () => {
     expect(load).toHaveBeenCalledWith(attachment)
     fireEvent.click(frame)
     expect(view.getByRole('dialog', { name: '原图预览' })).toBeTruthy()
-    fireEvent.click(view.getByRole('button', { name: '关闭原图预览' }))
+    fireEvent.click(view.getByRole('dialog').querySelector('img')!)
     expect(view.queryByRole('dialog', { name: '原图预览' })).toBeNull()
   })
 
@@ -254,6 +254,17 @@ describe('MessageImage preview arm', () => {
 })
 
 describe('ImageGallery', () => {
+  it('shows a resolution pill below a standalone assistant image, but not user images', () => {
+    const load = vi.fn(() => new Promise<string>(() => {}))
+    const assistant = render(<ImageGallery getTriggerProps={contextMenuHook()().getTriggerProps} fileDrag={fileDrag} images={[{ attachment }]} load={load} align="start" labels={labels} />)
+    const resolution = assistant.getByText('640 × 320 px')
+    expect(resolution).toBeTruthy()
+    expect(resolution.previousElementSibling?.tagName).toBe('BUTTON')
+    assistant.unmount()
+    const user = render(<ImageGallery getTriggerProps={contextMenuHook()().getTriggerProps} fileDrag={fileDrag} images={[{ attachment }]} load={load} align="end" labels={labels} />)
+    expect(user.queryByText('640 × 320 px')).toBeNull()
+  })
+
   it('renders nothing without images and an aligned wrapping group with them', async () => {
     const load = vi.fn().mockResolvedValue('blob:gallery')
     const empty = render(<ImageGallery
@@ -326,7 +337,7 @@ describe('ImageGallery', () => {
     expect(view.getByRole('dialog', { name: labels.lightbox.dialog })).toBeTruthy()
     fireEvent.contextMenu(view.getByRole('dialog').querySelector('img')!, { clientX: 13, clientY: 14 })
     expect(vi.spyOn(runtime.ctx.contextMenus, 'open')).toHaveBeenLastCalledWith({ kind: 'image', value: { url: 'blob:labels', name: 'preview.png' } }, { x: 13, y: 14 })
-    fireEvent.click(view.getByRole('button', { name: labels.lightbox.close }))
+    fireEvent.click(view.getByRole('dialog').querySelector('img')!)
     fireEvent.click(view.getByRole('button', { name: 'Default labels' }))
     const defaultFrame = view.getByRole('button', { name: 'preview.png, click to view original' })
     expect(defaultFrame).toBe(frame)
@@ -334,7 +345,7 @@ describe('ImageGallery', () => {
     expect(defaultFrame.getAttribute('title')).toBe('View original')
     fireEvent.click(defaultFrame)
     expect(view.getByRole('dialog', { name: 'Original image preview' })).toBeTruthy()
-    fireEvent.click(view.getByRole('button', { name: 'Close original image preview' }))
+    fireEvent.click(view.getByRole('dialog').querySelector('img')!)
     expect(loadImage).not.toHaveBeenCalled()
   })
 

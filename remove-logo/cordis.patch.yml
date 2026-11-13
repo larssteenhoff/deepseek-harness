@@ -1,0 +1,3 @@
+- insert:
+    - id: remove-logo
+      name: '@local/remove-logo'

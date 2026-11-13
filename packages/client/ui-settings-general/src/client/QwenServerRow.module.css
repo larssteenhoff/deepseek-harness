@@ -1,0 +1,4 @@
+.root { display: flex; flex-direction: column; gap: 16px; padding-block: 16px; border-block-start: 1px solid var(--dsw-alias-border-subtle); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.title { color: var(--dsw-alias-label-primary); font-size: 14px; }
+.description { color: var(--dsw-alias-label-secondary); font-size: 12px; margin-top: 4px; }

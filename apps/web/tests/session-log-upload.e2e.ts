@@ -19,7 +19,8 @@ it.skipIf(webSnapshotMode() === 'record')('persists the upload switch and omits 
   const overlay = join(root, 'upload.yml')
   await writeFile(overlay, JSON.stringify([
     { id: 'llm-deepseek', config: { baseURL: server.baseURL, apiKeyEnv: key } },
-    { id: 'session-log-deepseek', config: { enabled: true } },
+    { id: 'session-log-deepseek', disabled: false, config: { enabled: true } },
+    { id: 'ui-settings-session-log', disabled: false },
     { id: 'agent-default-model', config: { provider: 'deepseek-official', model: 'deepseek-v4-flash' } },
   ]))
   const scaffold = await launchWebScaffold({ deepSeekMissingCredential: true, extraOverlayPath: overlay })
@@ -45,7 +46,7 @@ it.skipIf(webSnapshotMode() === 'record')('persists the upload switch and omits 
     await expect.poll(() => toggle.getAttribute('aria-checked')).toBe(String(enabled))
     await expect.poll(async () => {
       const patches = parseEntryYaml(await readFile(join(scaffold.harnessHome, 'profiles/scaffold/cordis.patch.yml'), 'utf8')) as { id: string; config?: { enabled?: boolean } }[]
-      return patches.find(patch => patch.id === 'session-log-deepseek')?.config?.enabled ?? true
+      return patches.find(patch => patch.id === 'session-log-deepseek')?.config?.enabled ?? false
     }).toBe(enabled)
     await page.keyboard.press('Escape')
   }

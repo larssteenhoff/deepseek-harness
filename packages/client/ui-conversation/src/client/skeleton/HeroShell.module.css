@@ -27,7 +27,7 @@
    badge is a product addition outside that source: a mono superscript pill
    riding the title's top-right. */
 .headline {
-  display: flex;
+  display: none;
   /* Overflow-driven: the fish and the title group are two wrap units sharing
      one centered line while they fit; squeezed, the fish takes its own line
      above the group. No breakpoint. */
