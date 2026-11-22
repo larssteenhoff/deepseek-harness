@@ -18,17 +18,33 @@ interface RateLimitResponse {
 }
 
 const require = createRequire(import.meta.url)
-const manifestPath = require.resolve('@openai/codex/package.json')
-const manifest = require(manifestPath) as { bin: { codex: string } }
-const codexEntrypoint = resolve(dirname(manifestPath), manifest.bin.codex)
+
+/**
+ * Locate the Codex CLI entrypoint at request time; installations without `@openai/codex`, such as the packaged
+ * desktop runtime, must still load the session controller.
+ * @returns the Codex CLI script path, or undefined when the package is not installed.
+ */
+function codexEntrypoint(): string | undefined {
+  let manifestPath: string
+  try { manifestPath = require.resolve('@openai/codex/package.json') }
+  catch (_error) {
+    // A missing optional `@openai/codex` package means the quota service is unavailable, not a load failure.
+    return undefined
+  }
+  const manifest = require(manifestPath) as { bin: { codex: string } }
+  return resolve(dirname(manifestPath), manifest.bin.codex)
+}
 
 /**
  * Read weekly Codex subscription usage without reading or returning local credentials.
  * @returns remaining percentage and reset time, or null when no weekly Codex quota exists.
+ * @throws {Error} rejects with "Codex quota service is unavailable" when `@openai/codex` is not installed.
  */
 export function readCodexWeeklyQuota(): Promise<CodexWeeklyQuota | null> {
+  const entrypoint = codexEntrypoint()
+  if (entrypoint === undefined) return Promise.reject(new Error('Codex quota service is unavailable'))
   return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(process.execPath, [codexEntrypoint, 'app-server', '--stdio'], {
+    const child = spawn(process.execPath, [entrypoint, 'app-server', '--stdio'], {
       stdio: ['pipe', 'pipe', 'ignore'],
       windowsHide: true,
     })
