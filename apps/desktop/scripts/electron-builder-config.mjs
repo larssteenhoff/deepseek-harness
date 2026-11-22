@@ -168,6 +168,9 @@ export function createElectronBuilderConfig(
       category: 'public.app-category.developer-tools',
       // macOS matches the application locale against this bundle, not Electron Framework resources.
       extendInfo: {
+        // The Dock and Finder show "Harness". CFBundleName stays the productName because Electron locates its
+        // "<CFBundleName> Helper" apps from it, and productName also fixes artifact paths and app.name/userData.
+        CFBundleDisplayName: 'Harness',
         CFBundleLocalizations: ['en', 'zh_CN', 'ja', 'es', 'fr', 'de', 'ru', 'pt'],
         NSMicrophoneUsageDescription: 'DeepSeek Harness uses your microphone to transcribe speech into message drafts.',
       },
