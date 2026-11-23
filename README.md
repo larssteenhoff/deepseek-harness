@@ -8,6 +8,25 @@ It is built on an **everything-is-a-plugin** architecture and powered by [Cordis
 
 Documentation: [https://deepseek-harness.github.io/deepseek-harness/](https://deepseek-harness.github.io/deepseek-harness/)
 
+## Harness with TensorFold Bar on a Mac (this fork)
+
+This fork ships a desktop app named **Harness** that runs coding agents on a model served on your own Mac by [TensorFold](https://github.com/ashhart/TensorFold), controlled from the [TensorFold Bar](https://github.com/larssteenhoff/TensorFoldBar) menu bar app. On an Apple Silicon Mac with [Node.js](https://nodejs.org/en/download) 24.9 or newer and Git, install both with:
+
+```sh
+git clone https://github.com/larssteenhoff/deepseek-harness.git ~/deepseek-harness
+cd ~/deepseek-harness
+./install-mac.sh
+```
+
+The script builds and installs `~/Applications/Harness.app`, clones and builds TensorFold Bar into `~/TensorFoldBar` and installs `~/Applications/TensorFold Bar.app`, then sets up the Harness desktop profile:
+
+- the local TensorFold server (`http://127.0.0.1:8080/v1`, model `local-model`) as the default model,
+- [`tensorfold-launcher`](tensorfold-launcher/client.js): a TensorFold button above Settings in the sidebar that opens TensorFold Bar, or its GitHub page when it is not installed,
+- [`harness-colors`](harness-colors/client.js): a solid `#202020` sidebar and `#181818` main area in the dark theme,
+- [`remove-logo`](remove-logo/client.js): hides the sidebar brand mark and name.
+
+The plugins are linked from the checkout, so keep it in place; `git pull` and `./install-mac.sh` again update both apps and keep your settings. Pick a model and context window from TensorFold Bar's menu: the first start of a model downloads its weights (about 1.6 GB for the default Qwen3.5 2B, over 100 GB for the largest), and the Context menu also updates Harness's model entry. Options: `--skip-harness`, `--skip-tensorfold-bar`, `--no-launch`; see `./install-mac.sh --help`.
+
 ## Developer preview
 
 DeepSeek Harness is in _developer preview_ and iterating rapidly. **THERE WILL BE COMPATIBILITY-BREAKING CHANGES.**

@@ -1,0 +1,3 @@
+- insert:
+    - id: tensorfold-launcher
+      name: '@local/tensorfold-launcher'

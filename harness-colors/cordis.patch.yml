@@ -1,0 +1,3 @@
+- insert:
+    - id: harness-colors
+      name: '@local/harness-colors'
